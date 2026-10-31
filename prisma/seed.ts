@@ -16,13 +16,13 @@ async function main() {
   await prisma.warung.deleteMany()
 
   const warung1 = await prisma.warung.create({
-    data: { nama: 'Seafood Vian Jaya 08 (Kranggan)', kode: 'VJ08-1' },
+    data: { nama: 'Seafood & Nasi Uduk Bojong Kulur - Cabang 1', kode: 'BJK-1' },
   })
   const warung2 = await prisma.warung.create({
-    data: { nama: 'Seafood & Nasi Uduk Vian Jaya 08 - Cabang 2', kode: 'VJ08-2' },
+    data: { nama: 'Seafood & Nasi Uduk Bojong Kulur - Cabang 2', kode: 'BJK-2' },
   })
   const warung3 = await prisma.warung.create({
-    data: { nama: 'Seafood & Nasi Uduk Vian Jaya 08 - Cabang 3', kode: 'VJ08-3' },
+    data: { nama: 'Seafood & Nasi Uduk Bojong Kulur - Cabang 3', kode: 'BJK-3' },
   })
 
   console.log('✅ 3 warung dibuat')
@@ -32,7 +32,7 @@ async function main() {
     data: {
       username: 'owner',
       passwordHash: ownerPasswordHash,
-      namaLengkap: 'Owner Vian Jaya 08',
+      namaLengkap: 'Owner Bojong Kulur',
       role: 'OWNER',
     },
   })

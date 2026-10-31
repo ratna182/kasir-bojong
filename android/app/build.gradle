@@ -16,7 +16,7 @@ android {
     }
 
     defaultConfig {
-        applicationId "id.vianjaya.kasir.cabang1"
+        applicationId "id.kasirbojongkulur.kasir"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 8

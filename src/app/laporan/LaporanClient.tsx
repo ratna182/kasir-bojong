@@ -7,7 +7,7 @@ import PrinterStatusBadge from '@/components/PrinterStatus'
 import { printer } from '@/lib/printer'
 import { loadPrinterConfig } from '@/lib/printer/storage'
 import { encodeLaporan } from '@/lib/printer/laporan-encoder'
-import { formatBranchLine } from '@/lib/branch-config'
+import { BRAND_NAME, SOCIAL_LINES, formatBranchLine } from '@/lib/branch-config'
 import { formatWibDateTime, formatWibShiftRange, formatWibTime } from '@/lib/time'
 import { resolveLaporanSummary } from '@/lib/laporan-summary'
 import { isKategoriMinuman } from '@/lib/kategori'
@@ -580,12 +580,12 @@ export default function LaporanClient({ warungId, warungNama, warungs, role, ini
         <div className="print-only print-receipt">
           <div className="print-header">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img className="receipt-logo" src="/logo-baru.webp" alt="Seafood 08 Vian Jaya" style={{ display: 'block', width: '1.7cm', height: '1.7cm', objectFit: 'contain', margin: '0 auto 3px' }} />
+            <img className="receipt-logo" src="/logo-baru.webp" alt={BRAND_NAME} style={{ display: 'block', width: '1.7cm', height: '1.7cm', objectFit: 'contain', margin: '0 auto 3px' }} />
             {data.warung.alamat && <p>{data.warung.alamat}</p>}
             <div className="receipt-socials">
-              <p>IG : Seafood08vianjaya.id</p>
-              <p>FB : Seafood08vianjaya</p>
-              <p>TT : Seafood08vianjaya</p>
+              {SOCIAL_LINES.map((line) => (
+                <p key={line}>{line}</p>
+              ))}
             </div>
           </div>
           <div className="print-divider" />

@@ -1,14 +1,14 @@
 export const BRAND_NAME =
-  process.env.NEXT_PUBLIC_BRAND_NAME?.trim() || 'Kasir Bojong'
+  process.env.NEXT_PUBLIC_BRAND_NAME?.trim() || 'Kasir Bojong Kulur'
 
 export const STORE_NAME =
-  process.env.NEXT_PUBLIC_STORE_NAME?.trim() || 'Seafood & Nasi Uduk Bojong'
+  process.env.NEXT_PUBLIC_STORE_NAME?.trim() || 'Seafood & Nasi Uduk Bojong Kulur'
 
 export const DEFAULT_BRANCH_NAME =
   process.env.NEXT_PUBLIC_BRANCH_NAME?.trim() || `${STORE_NAME} - Cabang 1`
 
 export const DEFAULT_BRANCH_KODE =
-  process.env.NEXT_PUBLIC_BRANCH_KODE?.trim() || 'BJ-1'
+  process.env.NEXT_PUBLIC_BRANCH_KODE?.trim() || 'BJK-1'
 
 export const CONTACT_WA = process.env.NEXT_PUBLIC_CONTACT_WA?.trim() || ''
 
