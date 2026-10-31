@@ -1,0 +1,254 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Warung {
+  id            String          @id @default(uuid())
+  nama          String          @unique
+  kode          String          @unique
+  alamat        String?
+  createdAt     DateTime        @default(now()) @map("created_at")
+
+  users         User[]
+  menus         Menu[]
+  menuCategories MenuCategory[]
+  transaksis    Transaksi[]
+  kasirSesis    KasirSesi[]
+  kasirShifts   KasirShift[]
+  shiftEvents   KasirShiftEvent[]
+  warungMenus  WarungMenu[]
+  activityLogs  ActivityLog[]
+
+  @@map("warungs")
+}
+
+model User {
+  id           String      @id @default(uuid())
+  warungId     String?     @map("warung_id")
+  username     String      @unique
+  passwordHash String      @map("password_hash")
+  namaLengkap  String?     @map("nama_lengkap")
+  role         RoleUser    @default(KASIR)
+  isActive     Boolean     @default(true) @map("is_active")
+  createdAt    DateTime    @default(now()) @map("created_at")
+
+  warung       Warung?     @relation(fields: [warungId], references: [id])
+  kasirSesis   KasirSesi[]
+  shiftsDibuka KasirShift[]     @relation("ShiftDibuka")
+  shiftsDitutup KasirShift[]    @relation("ShiftDitutup")
+  shiftEvents  KasirShiftEvent[]
+  transaksis   Transaksi[]
+  activityLogs ActivityLog[]
+
+  @@map("users")
+}
+
+model Menu {
+  id         String          @id @default(uuid())
+  warungId   String          @map("warung_id")
+  categoryId String          @map("category_id")
+  nama       String
+  harga      Int
+  isAktif    Boolean         @default(true) @map("is_aktif")
+  sortOrder  Int             @default(0) @map("sort_order")
+  createdAt  DateTime        @default(now()) @map("created_at")
+  updatedAt  DateTime        @updatedAt @map("updated_at")
+
+  warung          Warung          @relation(fields: [warungId], references: [id])
+  category        MenuCategory    @relation(fields: [categoryId], references: [id])
+  transaksiItems  TransaksiItem[]
+  warungMenus     WarungMenu[]
+
+  @@unique([warungId, nama])
+  @@map("menus")
+}
+
+model WarungMenu {
+  id        String   @id @default(uuid())
+  warungId  String   @map("warung_id")
+  menuId    String   @map("menu_id")
+  harga     Int
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  warung Warung @relation(fields: [warungId], references: [id])
+  menu   Menu   @relation(fields: [menuId], references: [id])
+
+  @@unique([warungId, menuId])
+  @@map("warung_menus")
+}
+
+model MenuCategory {
+  id        String   @id @default(uuid())
+  warungId  String   @map("warung_id")
+  nama      String
+  sortOrder Int      @default(0) @map("sort_order")
+  isAktif   Boolean  @default(true) @map("is_aktif")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  warung Warung @relation(fields: [warungId], references: [id])
+  menus  Menu[]
+
+  @@unique([warungId, nama])
+  @@map("menu_categories")
+}
+
+model Transaksi {
+  id               String             @id @default(uuid())
+  warungId         String             @map("warung_id")
+  kasirId          String?            @map("kasir_id")
+  shiftId          String?            @map("shift_id")
+  nomorMeja        String             @map("nomor_meja")
+  status           StatusTransaksi    @default(OPEN)
+  metodePembayaran MetodePembayaran?  @map("metode_pembayaran")
+  total            Int                @default(0)
+  tanggal          DateTime           @default(now()) @map("tanggal") @db.Date
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+  printedAt        DateTime?          @map("printed_at")
+  idempotencyKey   String?            @map("idempotency_key")
+
+  warung  Warung          @relation(fields: [warungId], references: [id])
+  kasir   User?           @relation(fields: [kasirId], references: [id])
+  shift   KasirShift?     @relation(fields: [shiftId], references: [id])
+  items   TransaksiItem[]
+
+  @@unique([warungId, idempotencyKey])
+  @@index([warungId, nomorMeja, status])
+  @@index([kasirId, createdAt])
+  @@index([shiftId])
+  @@map("transaksis")
+}
+
+model TransaksiItem {
+  id          String    @id @default(uuid())
+  transaksiId String    @map("transaksi_id")
+  menuId      String    @map("menu_id")
+  namaMenu    String    @map("nama_menu")
+  hargaSatuan Int       @map("harga_satuan")
+  diskonSatuan Int      @default(0) @map("diskon_satuan")
+  catatan     String?
+  qty         Int
+  subtotal    Int
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  transaksi   Transaksi @relation(fields: [transaksiId], references: [id], onDelete: Cascade)
+  menu        Menu      @relation(fields: [menuId], references: [id])
+
+  @@index([transaksiId])
+  @@index([menuId])
+  @@map("transaksi_items")
+}
+
+model KasirSesi {
+  id                  String    @id @default(uuid())
+  warungId            String    @map("warung_id")
+  tanggal             DateTime  @map("tanggal") @db.Date
+  ditutupOleh         String    @map("ditutup_oleh")
+  dibukaPada          DateTime? @map("dibuka_pada")
+  ditutupPada         DateTime  @default(now()) @map("ditutup_pada")
+  dibukaKembaliPada   DateTime? @map("dibuka_kembali_pada")
+  totalTransaksi      Int       @map("total_transaksi")
+  totalPendapatan     Int       @map("total_pendapatan")
+
+  warung Warung @relation(fields: [warungId], references: [id])
+  user   User   @relation(fields: [ditutupOleh], references: [id])
+
+  @@index([warungId, tanggal, ditutupPada])
+  @@map("kasir_sesis")
+}
+
+model KasirShift {
+  id           String       @id @default(uuid())
+  warungId     String       @map("warung_id")
+  dibukaOleh   String       @map("dibuka_oleh")
+  ditutupOleh  String?      @map("ditutup_oleh")
+  dibukaPada   DateTime?    @map("dibuka_pada") @db.Timestamptz(3)
+  ditutupPada  DateTime?    @map("ditutup_pada") @db.Timestamptz(3)
+  status       StatusShift  @default(TERBUKA)
+  catatanBuka  String?      @map("catatan_buka")
+  catatanTutup String?      @map("catatan_tutup")
+  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  warung     Warung            @relation(fields: [warungId], references: [id])
+  pembuka    User              @relation("ShiftDibuka", fields: [dibukaOleh], references: [id])
+  penutup    User?             @relation("ShiftDitutup", fields: [ditutupOleh], references: [id])
+  transaksis Transaksi[]
+  events     KasirShiftEvent[]
+
+  @@index([warungId, status])
+  @@index([warungId, dibukaPada])
+  @@map("kasir_shifts")
+}
+
+model KasirShiftEvent {
+  id        String          @id @default(uuid())
+  shiftId   String          @map("shift_id")
+  warungId  String          @map("warung_id")
+  userId    String          @map("user_id")
+  jenis     JenisShiftEvent
+  waktu     DateTime        @default(now()) @db.Timestamptz(3)
+  catatan   String?
+  createdAt DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  shift  KasirShift @relation(fields: [shiftId], references: [id], onDelete: Restrict)
+  warung Warung     @relation(fields: [warungId], references: [id])
+  user   User       @relation(fields: [userId], references: [id])
+
+  @@index([shiftId])
+  @@index([warungId, waktu])
+  @@map("kasir_shift_events")
+}
+
+model ActivityLog {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  warungId  String?  @map("warung_id")
+  aktivitas String
+  detail    String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user   User    @relation(fields: [userId], references: [id])
+  warung Warung? @relation(fields: [warungId], references: [id])
+
+  @@index([warungId, createdAt])
+  @@index([userId, createdAt])
+  @@map("activity_logs")
+}
+
+enum RoleUser {
+  OWNER
+  KASIR
+}
+
+enum StatusTransaksi {
+  OPEN
+  SELESAI
+  BATAL
+}
+
+enum MetodePembayaran {
+  CASH
+  QRIS
+  TRANSFER
+}
+
+enum StatusShift {
+  TERBUKA
+  DITUTUP
+}
+
+enum JenisShiftEvent {
+  BUKA
+  TUTUP
+  PAKSA_TUTUP
+}

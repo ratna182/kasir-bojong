@@ -1,0 +1,667 @@
+'use client'
+
+import { useState, useEffect, useCallback } from 'react'
+import { FileSpreadsheet, FileText, Printer, Lock, Unlock, AlertTriangle } from 'lucide-react'
+import PrinterSetup from '@/components/PrinterSetup'
+import PrinterStatusBadge from '@/components/PrinterStatus'
+import { printer } from '@/lib/printer'
+import { loadPrinterConfig } from '@/lib/printer/storage'
+import { encodeLaporan } from '@/lib/printer/laporan-encoder'
+import { formatBranchLine } from '@/lib/branch-config'
+import { formatWibDateTime, formatWibShiftRange, formatWibTime } from '@/lib/time'
+import { resolveLaporanSummary } from '@/lib/laporan-summary'
+import { isKategoriMinuman } from '@/lib/kategori'
+
+interface RekapItem {
+  namaMenu: string
+  kategori: string
+  qtyTotal: number
+  pendapatanTotal: number
+}
+
+interface TransaksiItem {
+  nomorMeja: string
+  total: number
+  metodePembayaran: string
+  createdAt: string
+  shiftId: string | null
+  shiftNomor: number | null
+}
+
+interface AktivitasKasirItem {
+  waktu: string
+  kasir: string
+  aktivitas: string
+  detail: string | null
+}
+
+interface ShiftItem {
+  id: string
+  nomor: number
+  label: string
+  status: 'TERBUKA' | 'DITUTUP'
+  dibukaPada: string | null
+  ditutupPada: string | null
+  dibukaOleh: string
+  ditutupOleh: string | null
+  catatanBuka: string | null
+  catatanTutup: string | null
+  totalTransaksi: number
+  totalPendapatan: number
+  totalCash: number
+  totalQRIS: number
+  totalTransfer: number
+  jumlahItem: number
+  durationHours: number
+  overtime: boolean
+}
+
+interface LaporanDataLocal {
+  tanggal: string
+  warung: { id: string; nama: string; kode: string; alamat?: string | null }
+  shifts: ShiftItem[]
+  rekap: RekapItem[]
+  transaksi: TransaksiItem[]
+  grandTotalQty: number
+  grandTotalPendapatan: number
+  jumlahTransaksi: number
+  totalCash: number
+  totalQRIS: number
+  totalTransfer: number
+  aktivitasKasir: AktivitasKasirItem[]
+}
+
+interface ShiftStatus {
+  id: string
+  dibukaPada: string | null
+  ditutupPada: string | null
+  dibukaOleh: string
+  ditutupOleh: string | null
+  totalTransaksi: number
+  totalPendapatan: number
+  durationHours?: number
+  overtime?: boolean
+  status?: 'TERBUKA' | 'DITUTUP'
+}
+
+interface WarungOption { id: string; nama: string; kode: string }
+
+interface LaporanClientProps {
+  warungId: string
+  warungNama: string
+  warungs: WarungOption[]
+  role: string
+  initialData: LaporanDataLocal | null
+}
+
+function formatDuration(hours: number): string {
+  const totalMinutes = Math.max(0, Math.floor(hours * 60))
+  return `${Math.floor(totalMinutes / 60)}j ${totalMinutes % 60}m`
+}
+
+export default function LaporanClient({ warungId, warungNama, warungs, role, initialData }: LaporanClientProps) {
+  const [data, setData] = useState<LaporanDataLocal | null>(initialData)
+  const [loading, setLoading] = useState(!initialData)
+  const [openShift, setOpenShift] = useState<ShiftStatus | null>(null)
+  const [latestShift, setLatestShift] = useState<ShiftStatus | null>(null)
+  const [showCloseModal, setShowCloseModal] = useState(false)
+  const [closing, setClosing] = useState(false)
+  const [opening, setOpening] = useState(false)
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [selectedWarungId, setSelectedWarungId] = useState(warungId)
+  const [currentWarungNama, setCurrentWarungNama] = useState(warungNama)
+  const [tanggal, setTanggal] = useState(initialData?.tanggal ?? '')
+  const [showPrinterSetup, setShowPrinterSetup] = useState(false)
+  const [printing, setPrinting] = useState(false)
+  const [printerWidth, setPrinterWidth] = useState<'58mm' | '80mm'>('80mm')
+  const isOwner = role === 'OWNER'
+
+  useEffect(() => {
+    const saved = loadPrinterConfig()
+    if (saved) {
+      setPrinterWidth(saved.width)
+      printer.autoReconnect()
+    }
+  }, [])
+
+  const fetchStatus = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/kasir/status?${new URLSearchParams({ warungId: selectedWarungId })}`)
+      const result = await res.json()
+      if (!result.success) return
+      setOpenShift(result.data.shift ?? null)
+      setLatestShift(result.data.latestShift ?? null)
+    } catch { /* silent */ }
+  }, [selectedWarungId])
+
+  const fetchLaporan = useCallback(async (date?: string) => {
+    setLoading(true)
+    try {
+      const params = new URLSearchParams({ warung_id: selectedWarungId })
+      if (date) params.set('tanggal', date)
+      const res = await fetch(`/api/laporan/harian?${params}`)
+      const result = await res.json()
+      if (result.success) {
+        setData(result.data)
+        setTanggal(result.data.tanggal)
+      } else {
+        setFeedback({ type: 'error', message: result.message || 'Gagal memuat laporan' })
+      }
+    } catch {
+      setFeedback({ type: 'error', message: 'Koneksi ke server terganggu' })
+    } finally { setLoading(false) }
+  }, [selectedWarungId])
+
+  useEffect(() => {
+    void fetchStatus()
+    const interval = setInterval(() => void fetchStatus(), 10_000)
+    return () => clearInterval(interval)
+  }, [fetchStatus])
+
+  useEffect(() => {
+    if (selectedWarungId !== warungId) {
+      void fetchLaporan()
+      void fetchStatus()
+    }
+  }, [selectedWarungId, warungId, fetchLaporan, fetchStatus])
+
+  async function handleTutupKasir() {
+    setClosing(true)
+    try {
+      const res = await fetch('/api/kasir/tutup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ warungId: selectedWarungId }),
+      })
+      const result = await res.json()
+      if (result.success) {
+        setShowCloseModal(false)
+        setFeedback({ type: 'success', message: 'Shift kasir berhasil ditutup.' })
+        await Promise.all([fetchStatus(), fetchLaporan()])
+      } else {
+        setFeedback({ type: 'error', message: result.message || 'Gagal menutup kasir' })
+        setShowCloseModal(false)
+      }
+    } catch {
+      setFeedback({ type: 'error', message: 'Terjadi kesalahan sistem saat menutup kasir' })
+      setShowCloseModal(false)
+    } finally { setClosing(false) }
+  }
+
+  async function handleBukaKasir() {
+    if (!confirm('Buka shift kasir baru sekarang?')) return
+    setOpening(true)
+    try {
+      const res = await fetch('/api/kasir/buka', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ warungId: selectedWarungId }),
+      })
+      const result = await res.json()
+      if (result.success) {
+        setFeedback({ type: 'success', message: 'Shift kasir berhasil dibuka.' })
+        await Promise.all([fetchStatus(), fetchLaporan()])
+      } else {
+        setFeedback({ type: 'error', message: result.message || 'Gagal membuka kasir' })
+      }
+    } catch {
+      setFeedback({ type: 'error', message: 'Terjadi kesalahan sistem saat membuka kasir' })
+    } finally { setOpening(false) }
+  }
+
+  function handlePrint() {
+    const printWindow = window.open('', '_blank', 'width=280,height=500')
+    if (printWindow) {
+      const receiptEl = document.querySelector('.print-receipt')
+      const receiptHTML = receiptEl ? receiptEl.outerHTML : ''
+      printWindow.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Cetak Laporan</title><style>@page{size:auto;margin:0}*{box-sizing:border-box;margin:0;padding:0}html,body{width:100%;margin:0;padding:0}body{width:100%;margin:0;padding:0 2mm;font-family:'Helvetica','Arial',sans-serif;font-size:15px;font-weight:bold;color:black;background:white;-webkit-print-color-adjust:exact;print-color-adjust:exact}.print-receipt{width:100%;padding:0 2mm;text-align:center}.print-header{text-align:center;margin-bottom:3px}.receipt-logo{display:block;width:1.7cm;height:1.7cm;object-fit:contain;margin:0 auto 3px}.receipt-socials{text-align:center}.receipt-socials p{display:block;margin:0;text-align:center}.print-header h2{font-size:18px;text-transform:uppercase;margin:0 0 2px;line-height:1.3}.print-header p{font-size:14px;margin:0;line-height:1.3}.print-divider{border:none;border-top:1px dashed black;margin:3px 0}.print-table{width:100%;border-collapse:collapse;font-size:14px;margin-top:2px}.print-table{page-break-inside:auto}.print-table thead{display:table-header-group}.print-table tr{page-break-inside:avoid;break-inside:avoid}.print-table th,.print-table td{padding:1px 0;line-height:1.4;overflow-wrap:anywhere}.print-table th{border-bottom:1px dashed black;font-size:13px}.text-right{text-align:right}.print-total{margin-top:3px;border-top:1px dashed black;padding-top:3px}.print-total-row{display:flex;justify-content:space-between;font-size:14px;line-height:1.4}.print-total-row.grand{font-size:17px;font-weight:800;margin-top:1px}.print-footer{text-align:center;margin-top:3px;margin-bottom:0;padding-bottom:0;font-size:14px;line-height:1.4}.print-footer p{margin:0;line-height:1.4}@media print{body{width:100%}.print-receipt{width:100%}}</style></head><body>${receiptHTML}</body></html>`)
+      printWindow.document.close()
+      printWindow.focus()
+      setTimeout(() => { printWindow.print() }, 300)
+    }
+  }
+
+  const handlePrintWithRetry = async (bytes: Uint8Array, retries = 2): Promise<boolean> => {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      const ok = await printer.print(bytes)
+      if (ok) return true
+
+      if (attempt < retries) {
+        console.log(`Print attempt ${attempt + 1} failed, trying forceReconnect...`)
+        await printer.forceReconnect()
+        await new Promise(r => setTimeout(r, 1000))
+      }
+    }
+    return false
+  }
+
+  async function handlePrintThermal() {
+    if (!data) return
+    setPrinting(true)
+    try {
+      const encoded = await encodeLaporan(data, currentWarungNama, data.warung.alamat ?? null, printerWidth)
+      const success = await handlePrintWithRetry(encoded)
+      if (success) {
+        setFeedback({ type: 'success', message: 'Laporan berhasil dicetak.' })
+      } else {
+        handlePrint()
+      }
+    } catch {
+      setFeedback({ type: 'error', message: 'Gagal mencetak laporan.' })
+    } finally { setPrinting(false) }
+  }
+
+  async function handleExportExcel() {
+    try {
+      const params = new URLSearchParams({ warung_id: selectedWarungId, tanggal })
+      const res = await fetch(`/api/laporan/export?${params}`)
+      if (!res.ok) throw new Error('Gagal export')
+      const blob = await res.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `laporan-${tanggal}.xlsx`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      setFeedback({ type: 'success', message: 'Berhasil download laporan Excel!' })
+    } catch { setFeedback({ type: 'error', message: 'Gagal export laporan Excel' }) }
+  }
+
+  async function handleExportPDF() {
+    try {
+      const params = new URLSearchParams({ warung_id: selectedWarungId, tanggal })
+      const res = await fetch(`/api/laporan/export/pdf?${params}`)
+      if (!res.ok) throw new Error('Gagal export')
+      const blob = await res.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `laporan-${tanggal}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      setFeedback({ type: 'success', message: 'Berhasil download laporan PDF!' })
+    } catch { setFeedback({ type: 'error', message: 'Gagal export laporan PDF' }) }
+  }
+
+  const hasReport = Boolean(data && (data.shifts.length > 0 || data.rekap.length > 0))
+  const openDuration = openShift?.durationHours ?? 0
+  const isOvertime = Boolean(openShift?.overtime)
+  const summary = resolveLaporanSummary(data, openShift, tanggal)
+  const summaryTitle = summary?.scope === 'SHIFT' ? 'Ringkasan Shift Aktif' : 'Ringkasan Harian'
+
+  return (
+    <div>
+      <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.75rem' }}>
+        <div>
+          <h1 style={{ fontSize: '1.75rem', marginBottom: '4px' }}>Laporan Penjualan Harian</h1>
+          <p className="text-secondary text-sm">{data ? `Tanggal ${data.tanggal}` : 'Memuat...'} • {currentWarungNama}</p>
+        </div>
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <input
+            type="date"
+            className="form-input"
+            value={tanggal}
+            onChange={(e) => {
+              setTanggal(e.target.value)
+              void fetchLaporan(e.target.value)
+            }}
+            style={{ padding: '0.4rem 0.5rem', fontSize: '0.85rem' }}
+          />
+          {isOwner && (
+            <select
+              className="form-input"
+              style={{ minWidth: '180px', padding: '0.4rem 0.5rem', fontSize: '0.85rem' }}
+              value={selectedWarungId}
+              onChange={(e) => {
+                const newId = e.target.value
+                setSelectedWarungId(newId)
+                const found = warungs?.find(w => w.id === newId)
+                if (found) setCurrentWarungNama(found.nama)
+              }}
+            >
+              {warungs?.map(w => (
+                <option key={w.id} value={w.id}>{w.nama}</option>
+              ))}
+            </select>
+          )}
+          <button type="button" onClick={handleExportExcel} disabled={loading || !hasReport} className="btn btn-ghost" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+            <FileSpreadsheet size={16} /> Export Excel
+          </button>
+          <button type="button" onClick={handleExportPDF} disabled={loading || !hasReport} className="btn btn-ghost" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+            <FileText size={16} /> Export PDF
+          </button>
+          <button type="button" onClick={handlePrintThermal} disabled={loading || !hasReport || printing} className="btn btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Printer size={16} /> {printing ? 'Mencetak...' : 'Cetak Laporan'}
+          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+            {(['58mm', '80mm'] as const).map((w) => (
+              <button key={w} type="button" onClick={() => setPrinterWidth(w)} className={`btn btn-sm ${printerWidth === w ? 'btn-primary' : 'btn-ghost'}`} style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}>
+                {w}
+              </button>
+            ))}
+          </div>
+          <PrinterStatusBadge onSetupClick={() => setShowPrinterSetup(true)} />
+          {openShift ? (
+            <button type="button" onClick={() => setShowCloseModal(true)} disabled={loading} className="btn btn-danger" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Lock size={16} /> Tutup Shift
+            </button>
+          ) : (
+            <button type="button" onClick={handleBukaKasir} disabled={opening} className="btn btn-success" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Unlock size={16} /> {opening ? 'Membuka...' : 'Buka Shift Baru'}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {feedback && (
+        <div className={`alert no-print ${feedback.type === 'success' ? 'alert-success' : 'alert-error'}`} style={{ marginBottom: '1.25rem' }}>
+          <div>{feedback.message}</div>
+        </div>
+      )}
+
+      {isOvertime && (
+        <div className="alert alert-error no-print" style={{ marginBottom: '1.25rem' }}>
+          <div>
+            <strong>Peringatan: shift sudah berjalan {formatDuration(openDuration)}</strong>
+            <p style={{ margin: 0, fontSize: '0.85rem' }}>
+              Melewati batas 18 jam. Owner dapat menutup paksa shift dari halaman Dashboard atau Kasir dengan catatan.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {openShift ? (
+        <div className="alert alert-success no-print" style={{ marginBottom: '1.5rem' }}>
+          <div>
+            <strong>Status Kasir: BUKA</strong>
+            <p style={{ margin: 0, fontSize: '0.85rem' }}>
+              Dibuka {formatWibDateTime(openShift.dibukaPada)} WIB oleh <strong>{openShift.dibukaOleh}</strong> • durasi {formatDuration(openDuration)}
+            </p>
+          </div>
+        </div>
+      ) : latestShift ? (
+        <div className="alert alert-warning no-print" style={{ marginBottom: '1.5rem' }}>
+          <div>
+            <strong>Status Kasir: DITUTUP</strong>
+            <p style={{ margin: 0, fontSize: '0.85rem' }}>
+              Shift terakhir: {formatWibShiftRange(latestShift.dibukaPada, latestShift.ditutupPada)}
+              {latestShift.ditutupOleh ? ` oleh ${latestShift.ditutupOleh}` : ''}.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="alert alert-warning no-print" style={{ marginBottom: '1.5rem' }}>
+          <div><strong>Belum ada shift pada tanggal ini.</strong></div>
+        </div>
+      )}
+
+      <div className="no-print" style={{ marginBottom: '0.6rem', fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-text-muted)' }}>
+        {summaryTitle}
+      </div>
+
+      <div className="no-print" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.75rem' }}>
+        <div className="card" style={{ textAlign: 'center', padding: '1.25rem' }}>
+          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--color-brand)', fontFamily: "var(--font-fraunces), serif" }}>
+            {summary ? summary.jumlahTransaksi : '...'}
+          </div>
+          <div className="text-sm text-muted">Jumlah Transaksi</div>
+        </div>
+        <div className="card" style={{ textAlign: 'center', padding: '1.25rem' }}>
+          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--color-text-primary)', fontFamily: "var(--font-fraunces), serif" }}>
+            {summary ? summary.grandTotalQty : '...'}
+          </div>
+          <div className="text-sm text-muted">Total Porsi / Item Terjual</div>
+        </div>
+        <div className="card" style={{ textAlign: 'center', padding: '1.25rem' }}>
+          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--color-success)', fontFamily: "var(--font-fraunces), serif", fontVariantNumeric: 'tabular-nums' }}>
+            {summary ? `Rp ${summary.grandTotalPendapatan.toLocaleString('id-ID')}` : '...'}
+          </div>
+          <div className="text-sm text-muted">Total Pendapatan</div>
+        </div>
+      </div>
+
+      <div className="no-print" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
+        <div className="card" style={{ textAlign: 'center', padding: '1rem', borderLeft: '3px solid var(--color-success)' }}>
+          <div style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--color-success)', fontFamily: "var(--font-fraunces), serif" }}>
+            {summary ? `Rp ${(summary.totalCash || 0).toLocaleString('id-ID')}` : '...'}
+          </div>
+          <div className="text-xs text-muted">Cash</div>
+        </div>
+        <div className="card" style={{ textAlign: 'center', padding: '1rem', borderLeft: '3px solid var(--color-warning)' }}>
+          <div style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--color-warning)', fontFamily: "var(--font-fraunces), serif" }}>
+            {summary ? `Rp ${(summary.totalQRIS || 0).toLocaleString('id-ID')}` : '...'}
+          </div>
+          <div className="text-xs text-muted">QRIS</div>
+        </div>
+        <div className="card" style={{ textAlign: 'center', padding: '1rem', borderLeft: '3px solid var(--color-info)' }}>
+          <div style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--color-info)', fontFamily: "var(--font-fraunces), serif" }}>
+            {summary ? `Rp ${(summary.totalTransfer || 0).toLocaleString('id-ID')}` : '...'}
+          </div>
+          <div className="text-xs text-muted">Transfer</div>
+        </div>
+      </div>
+
+      <div className="no-print" style={{ marginBottom: '1.5rem' }}>
+        {loading ? (
+          <div className="card" style={{ padding: '3rem', textAlign: 'center' }}>
+            <div className="spinner" style={{ margin: '0 auto 1rem' }} />
+            <p className="text-secondary">Menghitung rekapitulasi data penjualan...</p>
+          </div>
+        ) : !hasReport ? (
+          <div className="card" style={{ textAlign: 'center', padding: '3.5rem 1rem' }}>
+            <h3>Belum Ada Transaksi</h3>
+            <p className="text-secondary text-sm" style={{ maxWidth: '400px', margin: '0 auto' }}>
+              Saat kasir mencatat transaksi pesanan baru, rekapitulasi menu dan pendapatan akan otomatis muncul di sini.
+            </p>
+          </div>
+        ) : (
+          <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: '1.25rem' }}>
+            <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface-raised)' }}>
+              <h2 style={{ fontSize: '1rem', margin: 0, fontWeight: 700 }}>Shift pada {data?.tanggal}</h2>
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ background: 'var(--color-surface-raised)', borderBottom: '1px solid var(--color-border)' }}>
+                    <th style={{ padding: '0.85rem 1.25rem', textAlign: 'left', fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>Shift</th>
+                    <th style={{ padding: '0.85rem 1rem', textAlign: 'left', fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>Buka / Tutup (WIB)</th>
+                    <th style={{ padding: '0.85rem 1rem', textAlign: 'left', fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>Kasir</th>
+                    <th style={{ padding: '0.85rem 1rem', textAlign: 'right', fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>Transaksi</th>
+                    <th style={{ padding: '0.85rem 1.25rem', textAlign: 'right', fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>Pendapatan</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data?.shifts.map((shift) => (
+                    <tr key={shift.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                      <td style={{ padding: '0.9rem 1.25rem', fontWeight: 700 }}>
+                        {shift.label}
+                        {shift.status === 'TERBUKA' && <span className="badge" style={{ marginLeft: '0.4rem', background: 'var(--color-success-light)', color: 'var(--color-success)' }}>Buka</span>}
+                        {shift.overtime && <span className="badge" style={{ marginLeft: '0.4rem', background: 'var(--color-danger-light)', color: 'var(--color-danger)' }}>Overtime</span>}
+                      </td>
+                      <td style={{ padding: '0.9rem 1rem', fontSize: '0.85rem' }}>{formatWibShiftRange(shift.dibukaPada, shift.ditutupPada)}</td>
+                      <td style={{ padding: '0.9rem 1rem', fontSize: '0.85rem' }}>
+                        {shift.dibukaOleh}{shift.ditutupOleh ? ` / ${shift.ditutupOleh}` : ''}
+                      </td>
+                      <td style={{ padding: '0.9rem 1rem', textAlign: 'right', fontWeight: 700 }}>{shift.totalTransaksi}</td>
+                      <td style={{ padding: '0.9rem 1.25rem', textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                        Rp {shift.totalPendapatan.toLocaleString('id-ID')}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {!loading && hasReport && (
+          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface-raised)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2 style={{ fontSize: '1rem', margin: 0, fontWeight: 700 }}>Rincian Penjualan Per Menu</h2>
+              <span className="text-xs text-secondary">{data?.rekap.length ?? 0} jenis menu terjual</span>
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ background: 'var(--color-surface-raised)', borderBottom: '1px solid var(--color-border)' }}>
+                    <th style={{ padding: '0.85rem 1.25rem', textAlign: 'left', fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>Nama Menu</th>
+                    <th style={{ padding: '0.85rem 1rem', textAlign: 'left', fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>Kategori</th>
+                    <th style={{ padding: '0.85rem 1rem', textAlign: 'right', fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>Qty Terjual</th>
+                    <th style={{ padding: '0.85rem 1.25rem', textAlign: 'right', fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>Subtotal (Rp)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data?.rekap.map((item, idx) => (
+                    <tr key={idx} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                      <td style={{ padding: '0.9rem 1.25rem', fontWeight: 600 }}>{item.namaMenu}</td>
+                      <td style={{ padding: '0.9rem 1rem' }}>
+                        <span className="badge" style={{ background: isKategoriMinuman(item.kategori) ? 'var(--color-success-light)' : 'var(--color-brand-light)', color: isKategoriMinuman(item.kategori) ? 'var(--color-success)' : 'var(--color-brand)', fontSize: '0.75rem' }}>
+                          {item.kategori}
+                        </span>
+                      </td>
+                      <td style={{ padding: '0.9rem 1rem', textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{item.qtyTotal}</td>
+                      <td style={{ padding: '0.9rem 1.25rem', textAlign: 'right', fontWeight: 700, color: 'var(--color-text-primary)', fontFamily: "var(--font-fraunces), serif", fontVariantNumeric: 'tabular-nums' }}>
+                        Rp {item.pendapatanTotal.toLocaleString('id-ID')}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr style={{ background: 'var(--color-surface-raised)', borderTop: '2px solid var(--color-border)', fontWeight: 800 }}>
+                    <td colSpan={2} style={{ padding: '1rem 1.25rem', fontSize: '0.95rem' }}>GRAND TOTAL</td>
+                    <td style={{ padding: '1rem', textAlign: 'right', fontSize: '1.1rem', color: 'var(--color-text-primary)', fontVariantNumeric: 'tabular-nums' }}>{data?.grandTotalQty}</td>
+                    <td style={{ padding: '1rem 1.25rem', textAlign: 'right', fontSize: '1.25rem', color: 'var(--color-success)', fontFamily: "var(--font-fraunces), serif", fontVariantNumeric: 'tabular-nums' }}>
+                      Rp {(data?.grandTotalPendapatan ?? 0).toLocaleString('id-ID')}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {showCloseModal && (
+        <div className="modal-overlay no-print" style={{ position: 'fixed', inset: 0, background: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', zIndex: 1000 }}>
+          <div className="card" style={{ width: '100%', maxWidth: '440px', padding: '1.75rem', background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-danger)' }}>
+            <div style={{ textAlign: 'center', marginBottom: '1.25rem' }}>
+              <AlertTriangle size={40} style={{ color: 'var(--color-danger)', marginBottom: '0.5rem' }} />
+              <h2 style={{ fontSize: '1.25rem', margin: '0 0 6px', color: 'var(--color-danger)' }}>Konfirmasi Tutup Shift</h2>
+              <p className="text-secondary text-sm">Tutup shift yang sedang berjalan sekarang?</p>
+            </div>
+            <div style={{ padding: '1rem', background: 'var(--color-surface-raised)', borderRadius: 'var(--radius-md)', marginBottom: '1.25rem', fontSize: '0.85rem', lineHeight: '1.5' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                <span className="text-secondary">Transaksi shift ini:</span>
+                <strong>{openShift?.totalTransaksi ?? 0} transaksi</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <span className="text-secondary">Pendapatan shift ini:</span>
+                <strong style={{ color: 'var(--color-success)', fontVariantNumeric: 'tabular-nums' }}>Rp {(openShift?.totalPendapatan ?? 0).toLocaleString('id-ID')}</strong>
+              </div>
+              <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '8px', color: 'var(--color-pending)', fontSize: '0.8rem' }}>
+                <strong>Perhatian:</strong> Pastikan semua pesanan sudah dibayar. Setelah ditutup, transaksi baru memerlukan shift baru.
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+              <button type="button" onClick={() => setShowCloseModal(false)} disabled={closing} className="btn btn-ghost">Batal</button>
+              <button type="button" onClick={handleTutupKasir} disabled={closing} className="btn btn-danger" style={{ minWidth: '130px', justifyContent: 'center' }}>
+                {closing ? 'Memproses...' : 'Ya, Tutup Shift'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {data && (
+        <div className="print-only print-receipt">
+          <div className="print-header">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img className="receipt-logo" src="/logo-baru.webp" alt="Seafood 08 Vian Jaya" style={{ display: 'block', width: '1.7cm', height: '1.7cm', objectFit: 'contain', margin: '0 auto 3px' }} />
+            {data.warung.alamat && <p>{data.warung.alamat}</p>}
+            <div className="receipt-socials">
+              <p>IG : Seafood08vianjaya.id</p>
+              <p>FB : Seafood08vianjaya</p>
+              <p>TT : Seafood08vianjaya</p>
+            </div>
+          </div>
+          <div className="print-divider" />
+          <div style={{ fontSize: '14px', fontWeight: 'bold', textAlign: 'center', marginBottom: '4px' }}>LAPORAN PENJUALAN HARIAN</div>
+          <div className="print-divider" />
+          <div style={{ fontSize: '14px', fontWeight: 'bold' }}>
+            <div>Tanggal: {data.tanggal}</div>
+            <div>Dicetak: {formatWibDateTime(new Date())} WIB | {formatBranchLine(currentWarungNama)}</div>
+          </div>
+          <div className="print-divider" />
+          <div style={{ fontSize: '13px', fontWeight: 'bold', textAlign: 'center', marginBottom: '2px' }}>SHIFT</div>
+          <div className="print-divider" />
+          <table className="print-table">
+            <tbody>
+              {data.shifts.map((shift) => (
+                <tr key={shift.id}>
+                  <td style={{ textAlign: 'left', fontWeight: 'bold' }}>{shift.label}{shift.status === 'TERBUKA' ? ' (MASIH BUKA)' : ''}</td>
+                  <td style={{ textAlign: 'right' }}>{formatWibShiftRange(shift.dibukaPada, shift.ditutupPada)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className="print-divider" />
+          <div style={{ fontSize: '13px', fontWeight: 'bold', textAlign: 'center', marginBottom: '2px' }}>DAFTAR TRANSAKSI</div>
+          <div className="print-divider" />
+          <table className="print-table">
+            <thead><tr><th>MEJA</th><th>WAKTU</th><th>METODE</th><th className="text-right">TOTAL</th></tr></thead>
+            <tbody>
+              {data.transaksi.map((tx, idx) => (
+                <tr key={idx}>
+                  <td>{tx.nomorMeja}</td>
+                  <td>{formatWibTime(tx.createdAt)}</td>
+                  <td>{tx.metodePembayaran === 'QRIS' ? 'QRIS' : tx.metodePembayaran === 'TRANSFER' ? 'TRSF' : 'CASH'}</td>
+                  <td className="text-right">{tx.total.toLocaleString('id-ID')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className="print-divider" />
+          <div style={{ fontSize: '13px', fontWeight: 'bold', textAlign: 'center', marginBottom: '2px' }}>REKAP MENU</div>
+          <div className="print-divider" />
+          <table className="print-table">
+            <thead><tr><th>MENU</th><th className="text-right">QTY</th><th className="text-right">TOTAL</th></tr></thead>
+            <tbody>
+              {data.rekap.map((item, idx) => (
+                <tr key={idx}>
+                  <td>{item.namaMenu}</td>
+                  <td className="text-right">{item.qtyTotal}</td>
+                  <td className="text-right">{item.pendapatanTotal.toLocaleString('id-ID')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className="print-divider" />
+          <div style={{ fontSize: '13px', fontWeight: 'bold', textAlign: 'center', marginBottom: '2px' }}>TOTAL PER METODE BAYAR</div>
+          <div className="print-divider" />
+          <div className="print-total">
+            <div className="print-total-row"><span>CASH</span><span>Rp {data.totalCash.toLocaleString('id-ID')}</span></div>
+            <div className="print-total-row"><span>QRIS</span><span>Rp {data.totalQRIS.toLocaleString('id-ID')}</span></div>
+            <div className="print-total-row"><span>TRANSFER</span><span>Rp {data.totalTransfer.toLocaleString('id-ID')}</span></div>
+          </div>
+          <div className="print-divider" />
+          <div className="print-total">
+            <div className="print-total-row"><span>Total Qty:</span><span>{data.grandTotalQty} item</span></div>
+            <div className="print-total-row"><span>Total Transaksi:</span><span>{data.jumlahTransaksi} transaksi</span></div>
+            <div className="print-total-row grand"><span>GRAND TOTAL:</span><span>Rp {data.grandTotalPendapatan.toLocaleString('id-ID')}</span></div>
+          </div>
+          <div className="print-divider" />
+          <div className="print-footer">
+            <p>*** REKAPITULASI RESMI ***</p>
+            <p>{currentWarungNama}</p>
+          </div>
+        </div>
+      )}
+
+      <PrinterSetup open={showPrinterSetup} onClose={() => setShowPrinterSetup(false)} onConfigured={(config) => { if (config) setPrinterWidth(config.width) }} />
+    </div>
+  )
+}
