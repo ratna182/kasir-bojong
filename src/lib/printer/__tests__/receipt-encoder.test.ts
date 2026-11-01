@@ -171,9 +171,9 @@ describe('encodeReceipt', () => {
     const order = [
       BRAND_NAME,
       'Jl. Raya Kranggan no.18',
-      'IG : kasirbojongkulur.id',
-      'FB : kasirbojongkulur',
-      'TT : kasirbojongkulur',
+      'IG : Seafoodvianjaya.id',
+      'FB : Seafoodvianjaya',
+      'TT : Seafoodvianjaya',
     ]
     let cursor = -1
     for (const marker of order) {

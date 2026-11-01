@@ -1,5 +1,5 @@
 export const BRAND_NAME =
-  process.env.NEXT_PUBLIC_BRAND_NAME?.trim() || 'Kasir Bojong Kulur'
+  process.env.NEXT_PUBLIC_BRAND_NAME?.trim() || 'Seafood Vian Jaya 08'
 
 export const STORE_NAME =
   process.env.NEXT_PUBLIC_STORE_NAME?.trim() || 'Seafood & Nasi Uduk Bojong Kulur'
@@ -12,10 +12,14 @@ export const DEFAULT_BRANCH_KODE =
 
 export const CONTACT_WA = process.env.NEXT_PUBLIC_CONTACT_WA?.trim() || ''
 
+/** Label cabang yang dicetak di header struk, terpisah dari nama warung di database. */
+export const RECEIPT_BRANCH_NAME =
+  process.env.NEXT_PUBLIC_RECEIPT_BRANCH_NAME?.trim() || 'Seafood Vian Jaya 08 (Bojongkulur)'
+
 const socialHandles: Array<[string, string | undefined]> = [
-  ['IG', process.env.NEXT_PUBLIC_INSTAGRAM],
-  ['FB', process.env.NEXT_PUBLIC_FACEBOOK],
-  ['TT', process.env.NEXT_PUBLIC_TIKTOK],
+  ['IG', process.env.NEXT_PUBLIC_INSTAGRAM ?? 'Seafoodvianjaya.id'],
+  ['FB', process.env.NEXT_PUBLIC_FACEBOOK ?? 'Seafoodvianjaya'],
+  ['TT', process.env.NEXT_PUBLIC_TIKTOK ?? 'Seafoodvianjaya'],
 ]
 
 export const SOCIAL_LINES: string[] = socialHandles.flatMap(([label, handle]) => {

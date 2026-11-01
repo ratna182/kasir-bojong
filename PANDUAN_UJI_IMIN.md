@@ -44,11 +44,17 @@ Centang satu per satu. Kalau ada yang gagal, catat langkah nomornya.
 6. **Cetak Struk Uji** — kertas keluar, teks terbaca, tidak terpotong.
 7. **Tes Cetak SPP** — berhasil tanpa error di layar.
 8. **Transaksi baru** — pilih menu, simpan, bayar (Cash/QRIS/Transfer).
-9. **Struk transaksi** — tercetak otomatis; cek:
-   - Nama: **Kasir Bojong Kulur**
-   - Cabang sesuai warung
-   - Alamat: **Jln. Raya Bojong Kulur No. 28**
-   - Item, total, bayar, kembalian benar
+9. **Struk transaksi** — tercetak otomatis; cek header:
+   ```
+   LOGO
+   Seafood Vian Jaya 08
+   Cabang : Seafood Vian Jaya 08 (Bojongkulur)
+   Jl. Raya Bojong Kulur No.28
+   IG : Seafoodvianjaya.id
+   FB : Seafoodvianjaya
+   TT : Seafoodvianjaya
+   ```
+   Lalu cek item, total, bayar, kembalian benar.
 10. **Riwayat** — buka transaksi tadi, coba "Cetak Ulang"; struk bertanda CETAK ULANG.
 11. **Laporan** — tutup shift, cetak laporan 80mm; semua baris muat dalam 48 kolom.
 12. **Refresh / buka ulang aplikasi** — sesi masih aktif, printer masih tersimpan.

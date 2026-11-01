@@ -17,9 +17,6 @@ export default defineConfig({
       '**/.next/**',
     ],
     env: {
-      NEXT_PUBLIC_INSTAGRAM: 'kasirbojongkulur.id',
-      NEXT_PUBLIC_FACEBOOK: 'kasirbojongkulur',
-      NEXT_PUBLIC_TIKTOK: 'kasirbojongkulur',
       NEXT_PUBLIC_CONTACT_WA: '0812-0000-0000',
     },
     coverage: {
