@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Search, ShoppingCart, X, Minus, Plus, Printer, CreditCard, Banknote, CheckCircle, Trash2, Pencil, Eye } from 'lucide-react'
+import { Search, ShoppingCart, X, Minus, Plus, Printer, CreditCard, Banknote, CheckCircle, Trash2, Pencil, Eye, Keyboard } from 'lucide-react'
 import Receipt, { type PrinterWidth } from '@/components/Receipt'
 import NotaPreview, { type NotaPreviewItem } from '@/components/NotaPreview'
 import PrinterSetup from '@/components/PrinterSetup'
@@ -14,7 +14,7 @@ import { printer } from '@/lib/printer'
 import { loadPrinterConfig } from '@/lib/printer/storage'
 import { encodeReceipt } from '@/lib/printer/receipt-encoder'
 import { hitungKembalian, generateQuickAmounts } from '@/lib/payment/cash'
-import { QUICK_TABLES, LESEHAN } from '@/lib/table-layout'
+import { QUICK_TABLES, LESEHAN, TABLE_LIMITS, buildTableName, type TableKind } from '@/lib/table-layout'
 import { sortByName } from '@/lib/menu-sort'
 
 interface Menu {
@@ -102,10 +102,15 @@ function createIdempotencyKey() {
 
 export default function TransaksiClient({ session, menus: initialMenus, initialActiveOrders, isKasirClosed, isShiftOvertime }: TransaksiClientProps) {
   const isKranggan = session.username.toLowerCase().includes('kranggan') || session.warungNama?.toLowerCase().includes('kranggan')
+  const isBojongKulur = !isKranggan
   const hasLesehan = session.username === 'kasir1' || isKranggan
   const quickTables = hasLesehan ? [...LESEHAN, TABLE_SECTION_GAP, ...QUICK_TABLES] : QUICK_TABLES
   const [cart, setCart] = useState<CartItem[]>([])
   const [nomorMeja, setNomorMeja] = useState('')
+  const [showTablePicker, setShowTablePicker] = useState(false)
+  const [tableKind, setTableKind] = useState<TableKind | 'Bungkus'>('Meja')
+  const [tableNumber, setTableNumber] = useState('')
+  const [tablePickerError, setTablePickerError] = useState('')
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -231,6 +236,38 @@ export default function TransaksiClient({ session, menus: initialMenus, initialA
     setShowBayarLangsung(false)
     setShowPreviewNota(false)
     resetIdempotencyKey()
+  }
+
+  function openTablePicker() {
+    const match = /^(Meja|Lesehan)\s+(\d+)$/.exec(nomorMeja.trim())
+    if (match) {
+      setTableKind(match[1] as TableKind)
+      setTableNumber(match[2])
+    } else {
+      setTableKind('Meja')
+      setTableNumber('')
+    }
+    setTablePickerError('')
+    setShowTablePicker(true)
+  }
+
+  function applyTableChoice() {
+    if (tableKind === 'Bungkus') {
+      const order = activeOrders.find((active) => active.nomorMeja === 'Bungkus')
+      if (order) selectOrder(order)
+      else { setSelectedOrder(null); setNomorMeja('Bungkus'); resetIdempotencyKey() }
+      setShowTablePicker(false)
+      return
+    }
+    const value = buildTableName(tableKind, tableNumber)
+    if (!value) {
+      setTablePickerError(`Nomor ${tableKind} harus 1-${TABLE_LIMITS[tableKind]}.`)
+      return
+    }
+    const order = activeOrders.find((active) => active.nomorMeja === value)
+    if (order) selectOrder(order)
+    else { setSelectedOrder(null); setNomorMeja(value); resetIdempotencyKey() }
+    setShowTablePicker(false)
   }
 
   function addToCart(menu: Menu) {
@@ -879,39 +916,62 @@ export default function TransaksiClient({ session, menus: initialMenus, initialA
             <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.4rem', color: 'var(--color-text-primary)' }}>
               Nomor Meja <span style={{ color: 'var(--color-danger)' }}>*</span>
             </label>
-            <input
-              type="text"
-              className="form-input"
-              placeholder="Ketik nomor meja atau klik tombol di bawah..."
-              value={nomorMeja}
-              onChange={(e) => { setNomorMeja(e.target.value); resetIdempotencyKey() }}
-              style={{ marginBottom: '0.5rem', width: '100%' }}
-              disabled={isKasirClosed}
-            />
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(86px, 1fr))', gap: '0.35rem' }}>
-              {quickTables.map((table) => table === TABLE_SECTION_GAP ? (
-                <div key={table} style={{ gridColumn: '1 / -1', height: '0.75rem' }} aria-hidden="true" />
-              ) : (
+            {isBojongKulur ? (
+              <>
                 <button
-                  key={table}
                   type="button"
-                  onClick={() => {
-                    const order = activeOrders.find((active) => active.nomorMeja === table)
-                    if (order) selectOrder(order)
-                    else { setSelectedOrder(null); setNomorMeja(table); resetIdempotencyKey() }
-                  }}
+                  onClick={openTablePicker}
                   disabled={isKasirClosed}
-                  className="btn btn-ghost btn-sm"
+                  className="btn btn-ghost"
                   style={{
-                    fontSize: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: 'var(--radius-sm)', whiteSpace: 'nowrap',
-                    background: nomorMeja === table ? 'var(--color-brand)' : 'var(--color-surface-raised)',
-                    color: nomorMeja === table ? '#fff' : 'var(--color-text-secondary)',
+                    width: '100%', minHeight: '48px', justifyContent: 'space-between',
+                    border: '1px dashed var(--color-border)', background: 'var(--color-surface-raised)',
                   }}
                 >
-                  {table}
+                  <span style={{ fontWeight: 600 }}>{nomorMeja || 'Input Nomor Meja'}</span>
+                  <Keyboard size={18} />
                 </button>
-              ))}
-            </div>
+                <p className="text-secondary" style={{ margin: '0.35rem 0 0', fontSize: '0.75rem' }}>
+                  Ketik nomor meja / lesehan, lalu tekan Enter atau OK.
+                </p>
+              </>
+            ) : (
+              <>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="Ketik nomor meja atau klik tombol di bawah..."
+                  value={nomorMeja}
+                  onChange={(e) => { setNomorMeja(e.target.value); resetIdempotencyKey() }}
+                  style={{ marginBottom: '0.5rem', width: '100%' }}
+                  disabled={isKasirClosed}
+                />
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(86px, 1fr))', gap: '0.35rem' }}>
+                  {quickTables.map((table) => table === TABLE_SECTION_GAP ? (
+                    <div key={table} style={{ gridColumn: '1 / -1', height: '0.75rem' }} aria-hidden="true" />
+                  ) : (
+                    <button
+                      key={table}
+                      type="button"
+                      onClick={() => {
+                        const order = activeOrders.find((active) => active.nomorMeja === table)
+                        if (order) selectOrder(order)
+                        else { setSelectedOrder(null); setNomorMeja(table); resetIdempotencyKey() }
+                      }}
+                      disabled={isKasirClosed}
+                      className="btn btn-ghost btn-sm"
+                      style={{
+                        fontSize: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: 'var(--radius-sm)', whiteSpace: 'nowrap',
+                        background: nomorMeja === table ? 'var(--color-brand)' : 'var(--color-surface-raised)',
+                        color: nomorMeja === table ? '#fff' : 'var(--color-text-secondary)',
+                      }}
+                    >
+                      {table}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
 
           {/* Selected Order */}
@@ -1153,6 +1213,78 @@ export default function TransaksiClient({ session, menus: initialMenus, initialA
             {editingCartItem.catatan && <input type="text" maxLength={160} className="form-input" placeholder="Contoh: pilih yang besar" value={editingCartItem.catatan} onChange={(event) => setEditingCartItem({ ...editingCartItem, catatan: event.target.value })} />}
             <button type="button" onClick={saveCartItemEdit} className="btn btn-primary item-edit-save">SIMPAN</button>
           </div>
+        </div>
+      )}
+
+      {showTablePicker && (
+        <div
+          className="modal-overlay no-print"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="table-picker-title"
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', zIndex: 1000 }}
+          onClick={(event) => { if (event.target === event.currentTarget) setShowTablePicker(false) }}
+        >
+          <form
+            onSubmit={(event) => { event.preventDefault(); applyTableChoice() }}
+            className="card"
+            style={{ width: '100%', maxWidth: '380px', padding: '1.25rem', background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+              <h2 id="table-picker-title" style={{ fontSize: '1.1rem', margin: 0 }}>Input Nomor Meja</h2>
+              <button type="button" onClick={() => setShowTablePicker(false)} className="btn btn-ghost" style={{ padding: '4px' }} aria-label="Tutup input nomor meja">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.35rem', marginBottom: '0.75rem' }}>
+              {(['Meja', 'Lesehan', 'Bungkus'] as const).map((kind) => (
+                <button
+                  key={kind}
+                  type="button"
+                  onClick={() => { setTableKind(kind); setTablePickerError('') }}
+                  className="btn btn-sm"
+                  style={{
+                    flex: 1, minHeight: '44px', justifyContent: 'center',
+                    border: '1px solid var(--color-border)',
+                    background: tableKind === kind ? 'var(--color-brand)' : 'var(--color-surface-raised)',
+                    color: tableKind === kind ? '#fff' : 'var(--color-text-secondary)',
+                  }}
+                >
+                  {kind}
+                </button>
+              ))}
+            </div>
+
+            {tableKind !== 'Bungkus' && (
+              <input
+                autoFocus
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                autoComplete="off"
+                className="form-input"
+                placeholder={`Nomor ${tableKind} (1-${TABLE_LIMITS[tableKind]})`}
+                value={tableNumber}
+                onChange={(event) => { setTableNumber(event.target.value.replace(/[^0-9]/g, '')); setTablePickerError('') }}
+                style={{ width: '100%', fontSize: '1.5rem', textAlign: 'center', letterSpacing: '0.1em', marginBottom: '0.35rem' }}
+                aria-label={`Nomor ${tableKind}`}
+              />
+            )}
+
+            {tablePickerError && (
+              <p style={{ color: 'var(--color-danger)', fontSize: '0.8rem', margin: '0 0 0.5rem' }}>{tablePickerError}</p>
+            )}
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginTop: '0.5rem' }}>
+              <button type="button" className="btn btn-ghost" onClick={() => setShowTablePicker(false)} style={{ minHeight: '48px', justifyContent: 'center' }}>
+                Batal
+              </button>
+              <button type="submit" className="btn btn-primary" style={{ minHeight: '48px', justifyContent: 'center' }}>
+                OK
+              </button>
+            </div>
+          </form>
         </div>
       )}
 
