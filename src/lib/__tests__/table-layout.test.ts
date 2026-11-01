@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { TABLE_LIMITS, buildTableName } from '../table-layout'
+import { LESEHAN, QUICK_TABLES, TABLE_LIMITS, buildTableName } from '../table-layout'
+
+describe('quick tables untuk Kranggan', () => {
+  it('tetap Meja 1-15, Lesehan 1-11, dan Bungkus', () => {
+    expect(QUICK_TABLES).toHaveLength(16)
+    expect(QUICK_TABLES[0]).toBe('Meja 1')
+    expect(QUICK_TABLES[14]).toBe('Meja 15')
+    expect(QUICK_TABLES[15]).toBe('Bungkus')
+    expect(LESEHAN).toHaveLength(11)
+    expect(LESEHAN[10]).toBe('Lesehan 11')
+  })
+})
 
 describe('buildTableName', () => {
   it('allows up to 50 meja and 50 lesehan', () => {
