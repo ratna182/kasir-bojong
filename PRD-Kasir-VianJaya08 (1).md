@@ -1,4 +1,4 @@
-# PRD — Aplikasi Kasir Seafood & Nasi Uduk "Vian Jaya 08"
+# PRD — Aplikasi Kasir Seafood Vian Jaya 08
 
 Versi: 1.0 (Draft untuk approval)
 Status: **BELUM DISETUJUI — jangan mulai implementasi sebelum semua OPEN QUESTION dijawab dan PRD ini di-approve.**

@@ -1,7 +1,7 @@
 # Design System — Kasir Vian Jaya 08
 
 Dokumen ini adalah rujukan visual untuk seluruh UI aplikasi kasir Vian Jaya 08
-(Seafood & Nasi Uduk, 3 cabang). Target rasa: **premium & classy**, setara
+(Seafood Vian Jaya 08, 3 cabang). Target rasa: **premium & classy**, setara
 sistem kasir kelas atas (Toast POS, Lightspeed Restaurant, SumUp Solo,
 sistem kasir retail butik seperti Aesop) — tapi tetap cepat dan utilitarian
 untuk dipakai kasir di lingkungan warung yang sibuk, bukan lambat atau

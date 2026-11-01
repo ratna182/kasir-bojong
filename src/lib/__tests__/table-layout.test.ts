@@ -3,10 +3,15 @@ import { LESEHAN, QUICK_TABLES, TABLE_LIMITS, buildTableName } from '../table-la
 
 describe('quick tables untuk Kranggan', () => {
   it('tetap Meja 1-15, Lesehan 1-11, dan Bungkus', () => {
-    expect(QUICK_TABLES).toHaveLength(16)
+    expect(QUICK_TABLES).toHaveLength(21)
     expect(QUICK_TABLES[0]).toBe('Meja 1')
     expect(QUICK_TABLES[14]).toBe('Meja 15')
-    expect(QUICK_TABLES[15]).toBe('Bungkus')
+    expect(QUICK_TABLES[15]).toBe('Meja A')
+    expect(QUICK_TABLES[16]).toBe('Meja B')
+    expect(QUICK_TABLES[17]).toBe('Meja C')
+    expect(QUICK_TABLES[18]).toBe('Meja D')
+    expect(QUICK_TABLES[19]).toBe('Meja E')
+    expect(QUICK_TABLES[20]).toBe('Bungkus')
     expect(LESEHAN).toHaveLength(11)
     expect(LESEHAN[10]).toBe('Lesehan 11')
   })

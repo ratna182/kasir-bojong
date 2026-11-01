@@ -25,7 +25,7 @@ export default function Navbar({ session, activePage }: NavbarProps) {
           <div className="navbar-logo">VJ</div>
           <div>
             <div className="navbar-title">{session.warungNama || DEFAULT_BRANCH_NAME}</div>
-            <div className="navbar-subtitle">Seafood &amp; Nasi Uduk</div>
+            <div className="navbar-subtitle">Seafood Vian Jaya 08</div>
           </div>
         </Link>
       </div>
@@ -147,4 +147,3 @@ export default function Navbar({ session, activePage }: NavbarProps) {
       </div>
     </nav>
   )
-}

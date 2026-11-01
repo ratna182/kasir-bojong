@@ -1,6 +1,7 @@
 // Tombol cepat cabang Kranggan — biarkan sesuai aslinya.
 export const QUICK_TABLES = [
   ...Array.from({ length: 15 }, (_, index) => `Meja ${index + 1}`),
+  ...Array.from({ length: 5 }, (_, index) => `Meja ${String.fromCharCode(65 + index)}`),
   'Bungkus',
 ] as const
 
@@ -14,6 +15,7 @@ export const TABLE_LIMITS: Record<TableKind, number> = { Meja: 50, Lesehan: 50 }
 export const VALID_TABLE_NAMES = new Set<string>([
   'Bungkus',
   ...Array.from({ length: TABLE_LIMITS.Meja }, (_, index) => `Meja ${index + 1}`),
+  ...Array.from({ length: 5 }, (_, index) => `Meja ${String.fromCharCode(65 + index)}`),
   ...Array.from({ length: TABLE_LIMITS.Lesehan }, (_, index) => `Lesehan ${index + 1}`),
 ])
 

@@ -1,6 +1,6 @@
-# Kasir Seafood & Nasi Uduk “Vian Jaya 08” 🐟🍚
+# Kasir Seafood Vian Jaya 08 “Vian Jaya 08” 🐟🍚
 
-Aplikasi POS (Point of Sales) multi-outlet untuk 3 cabang warung makan **Seafood & Nasi Uduk Vian Jaya 08**. Dibuat dengan Next.js 16 (App Router), TypeScript, Prisma ORM, dan PostgreSQL.
+Aplikasi POS (Point of Sales) multi-outlet untuk 3 cabang warung makan **Seafood Vian Jaya 08**. Dibuat dengan Next.js 16 (App Router), TypeScript, Prisma ORM, dan PostgreSQL.
 
 ---
 

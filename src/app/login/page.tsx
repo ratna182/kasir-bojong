@@ -82,7 +82,7 @@ export default function LoginPage() {
           <div className="login-header">
             <div className="login-logo">VJ</div>
             <h1 className="login-title">{DEFAULT_BRANCH_NAME}</h1>
-            <p className="login-subtitle">Seafood & Nasi Uduk</p>
+            <p className="login-subtitle">Seafood Vian Jaya 08</p>
             <p className="login-desc">Sistem Kasir Digital</p>
           </div>
 

@@ -1,9 +1,9 @@
 -- Restore the documented cashier accounts without touching existing data.
 INSERT INTO "warungs" ("id", "nama", "kode")
 VALUES
-  ('10000000-0000-4000-8000-000000000001', 'Seafood & Nasi Uduk Vian Jaya 08 - Cabang 1', 'VJ08-1'),
-  ('10000000-0000-4000-8000-000000000002', 'Seafood & Nasi Uduk Vian Jaya 08 - Cabang 2', 'VJ08-2'),
-  ('10000000-0000-4000-8000-000000000003', 'Seafood & Nasi Uduk Vian Jaya 08 - Cabang 3', 'VJ08-3')
+  ('10000000-0000-4000-8000-000000000001', 'Seafood Vian Jaya 08 (Bojongkulur)', 'VJ08-1'),
+('10000000-0000-4000-8000-000000000002', 'Seafood Vian Jaya 08 (Bojongkulur)', 'VJ08-2'),
+('10000000-0000-4000-8000-000000000003', 'Seafood Vian Jaya 08 (Bojongkulur)', 'VJ08-3')
 ON CONFLICT ("kode") DO NOTHING;
 
 INSERT INTO "users" ("id", "warung_id", "username", "password_hash", "nama_lengkap", "role", "is_active")

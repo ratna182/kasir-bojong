@@ -2,7 +2,7 @@ export const BRAND_NAME =
   process.env.NEXT_PUBLIC_BRAND_NAME?.trim() || 'Seafood Vian Jaya 08'
 
 export const STORE_NAME =
-  process.env.NEXT_PUBLIC_STORE_NAME?.trim() || 'Seafood & Nasi Uduk Bojong Kulur'
+  process.env.NEXT_PUBLIC_STORE_NAME?.trim() || 'Seafood Vian Jaya 08 (Bojongkulur)'
 
 export const DEFAULT_BRANCH_NAME =
   process.env.NEXT_PUBLIC_BRANCH_NAME?.trim() || `${STORE_NAME} - Cabang 1`

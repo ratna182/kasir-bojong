@@ -11,7 +11,7 @@ const CUT_TAIL = [0x1B, 0x33, 20, 0x0A, 0x0A, 0x0A, 0x0A, 0x1D, 0x56, 0x00]
 
 const DATA: LaporanData = {
   tanggal: '2026-09-16',
-  warung: { id: 'w1', nama: 'Seafood & Nasi Uduk Vian Jaya 08 - Cabang 2', kode: '08', alamat: 'Jl. Pesisir No. 1' },
+  warung: { id: 'w1', nama: 'Seafood Vian Jaya 08 - Cabang 2', kode: '08', alamat: 'Jl. Pesisir No. 1' },
   shifts: [{
     id: 's1',
     nomor: 1,
@@ -99,7 +99,7 @@ describe('encodeLaporan', () => {
       'IG : Seafoodvianjaya.id',
       'LAPORAN PENJUALAN HARIAN',
       'Tanggal: 2026-09-16',
-      'Cabang : Seafood & Nasi Uduk Vian Jaya 08 -',
+      'Cabang : Seafood Vian Jaya 08 -',
       'Shift 1',
       'DAFTAR TRANSAKSI',
       'DETAIL SHIFT',
