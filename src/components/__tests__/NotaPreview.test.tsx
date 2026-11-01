@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import NotaPreview from '../NotaPreview'
+import { formatBranchLine } from '@/lib/branch-config'
 
 describe('NotaPreview', () => {
   it('renders the branch, table, item details, discount, note, and server total', () => {
@@ -47,6 +48,6 @@ describe('NotaPreview', () => {
       />,
     )
 
-    expect(screen.getByText('Cabang : Seafood Vian Jaya 08 (Kranggan)')).toBeInTheDocument()
+    expect(screen.getByText(formatBranchLine(null))).toBeInTheDocument()
   })
 })

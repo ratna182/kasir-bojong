@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { encodeReceipt } from '../receipt-encoder'
 import { buildReceiptLines, createReceiptData } from '../receipt-content'
 import { encodeRasterImage } from '../escpos'
+import { BRAND_NAME, CONTACT_WA } from '@/lib/branch-config'
 
 const logo = vi.hoisted(() => ({ load: vi.fn(async (): Promise<Uint8Array | null> => null) }))
 vi.mock('../logo', () => ({
@@ -130,13 +131,13 @@ describe('encodeReceipt', () => {
       warungNama: null,
       width: '80mm',
     })
-    const header = receiptLines(output).find((line) => line.includes('Seafood Vian Jaya 08'))
+    const header = receiptLines(output).find((line) => line.includes(BRAND_NAME))
     expect(header).toBeDefined()
     const pad = header?.match(/^ */)?.[0].length ?? 0
-    // 20 characters at double width occupy 40 of 48 columns, so the pad is (24 - 20) / 2.
-    expect(header?.trimStart().length).toBe(20)
-    expect(pad).toBe(2)
-    expect(pad * 2 + 20 * 2).toBeLessThanOrEqual(48)
+    const expectedPad = Math.floor((24 - BRAND_NAME.length) / 2)
+    expect(header?.trimStart().length).toBe(BRAND_NAME.length)
+    expect(pad).toBe(expectedPad)
+    expect(pad * 2 + BRAND_NAME.length * 2).toBeLessThanOrEqual(48)
   })
 
   it('prints exactly the lines shared with the receipt preview', async () => {
@@ -168,11 +169,11 @@ describe('encodeReceipt', () => {
       }),
     )
     const order = [
-      'Seafood Vian Jaya 08',
+      BRAND_NAME,
       'Jl. Raya Kranggan no.18',
-      'IG : Seafood08vianjaya.id',
-      'FB : Seafood08vianjaya',
-      'TT : Seafood08vianjaya',
+      'IG : kasirbojongkulur.id',
+      'FB : kasirbojongkulur',
+      'TT : kasirbojongkulur',
     ]
     let cursor = -1
     for (const marker of order) {
@@ -221,7 +222,7 @@ describe('encodeReceipt', () => {
     expect(lines.some((line) => line.startsWith('Bayar (Transfer)') && line.endsWith('Rp 35.000'))).toBe(true)
     expect(lines.filter((line) => line.trim() === 'Terima Kasih')).toHaveLength(1)
     expect(lines.some((line) => line.trim() === 'Selamat Datang Kembali')).toBe(true)
-    expect(lines.some((line) => line.trim() === 'Kritik dan Saran WA: 0852-8000-4508')).toBe(true)
+    expect(lines.some((line) => line.trim() === `Kritik dan Saran WA: ${CONTACT_WA}`)).toBe(true)
     expect(lines.some((line) => line.includes('Kritik & Saran'))).toBe(false)
   })
 
@@ -308,7 +309,7 @@ describe('encodeReceipt', () => {
 
     const output = await encodeReceipt({ transaction: TRANSACTION, cashier: 'Kasir', warungNama: null, width: '80mm' })
     const rasterAt = indexOfBytes(output, raster)
-    const headerAt = indexOfText(output, 'Seafood Vian Jaya 08')
+    const headerAt = indexOfText(output, BRAND_NAME)
 
     expect(rasterAt).toBeGreaterThan(-1)
     expect(headerAt).toBeGreaterThan(rasterAt)

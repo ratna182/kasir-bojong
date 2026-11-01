@@ -6,6 +6,7 @@ import {
   createReceiptData,
   type ReceiptTransaction,
 } from '@/lib/printer/receipt-content'
+import { BRAND_NAME } from '@/lib/branch-config'
 
 const TRANSACTION: ReceiptTransaction = {
   id: 'tx-1',
@@ -69,6 +70,6 @@ describe('Receipt preview', () => {
     const large = container.querySelectorAll('.receipt-line-large')
 
     expect(large).toHaveLength(1)
-    expect(large[0].textContent).toContain('Seafood Vian Jaya 08')
+    expect(large[0].textContent).toContain(BRAND_NAME)
   })
 })

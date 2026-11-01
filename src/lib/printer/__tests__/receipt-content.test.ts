@@ -6,6 +6,7 @@ import {
   type CreateReceiptInput,
   type ReceiptTransaction,
 } from '../receipt-content'
+import { BRAND_NAME, CONTACT_WA } from '@/lib/branch-config'
 
 const TRANSACTION: ReceiptTransaction = {
   id: 'tx-1',
@@ -124,14 +125,14 @@ describe('buildReceiptLines', () => {
     const texts = textsOf(makeReceipt({ metodePembayaran: 'TRANSFER' }))
     expect(texts.some((line) => line.trim() === 'Terima Kasih')).toBe(true)
     expect(texts.some((line) => line.trim() === 'Selamat Datang Kembali')).toBe(true)
-    expect(texts.some((line) => line.trim() === 'Kritik dan Saran WA: 0852-8000-4508')).toBe(true)
+    expect(texts.some((line) => line.trim() === `Kritik dan Saran WA: ${CONTACT_WA}`)).toBe(true)
     expect(texts.some((line) => line.includes('Terimakasih'))).toBe(false)
   })
 
   it('marks reprints above the shop name', () => {
     const texts = textsOf(makeReceipt({}, { reprint: true }))
     expect(texts.findIndex((line) => line.includes('CETAK ULANG'))).toBeLessThan(
-      texts.findIndex((line) => line.includes('Seafood Vian Jaya 08')),
+      texts.findIndex((line) => line.includes(BRAND_NAME)),
     )
   })
 
