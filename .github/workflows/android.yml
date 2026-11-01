@@ -50,6 +50,9 @@ jobs:
       - name: Install npm dependencies
         run: npm ci
 
+      - name: Run unit tests
+        run: npm run test:run
+
       - name: Build web assets
         run: npm run build
         env:
