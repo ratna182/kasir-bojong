@@ -15,14 +15,16 @@ async function main() {
   await prisma.user.deleteMany()
   await prisma.warung.deleteMany()
 
+  const alamat = 'Jln. Raya Bojong Kulur No. 28'
+
   const warung1 = await prisma.warung.create({
-    data: { nama: 'Seafood & Nasi Uduk Bojong Kulur - Cabang 1', kode: 'BJK-1' },
+    data: { nama: 'Seafood & Nasi Uduk Bojong Kulur - Cabang 1', kode: 'BJK-1', alamat },
   })
   const warung2 = await prisma.warung.create({
-    data: { nama: 'Seafood & Nasi Uduk Bojong Kulur - Cabang 2', kode: 'BJK-2' },
+    data: { nama: 'Seafood & Nasi Uduk Bojong Kulur - Cabang 2', kode: 'BJK-2', alamat },
   })
   const warung3 = await prisma.warung.create({
-    data: { nama: 'Seafood & Nasi Uduk Bojong Kulur - Cabang 3', kode: 'BJK-3' },
+    data: { nama: 'Seafood & Nasi Uduk Bojong Kulur - Cabang 3', kode: 'BJK-3', alamat },
   })
 
   console.log('✅ 3 warung dibuat')
