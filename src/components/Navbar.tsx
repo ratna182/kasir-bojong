@@ -147,3 +147,4 @@ export default function Navbar({ session, activePage }: NavbarProps) {
       </div>
     </nav>
   )
+}
