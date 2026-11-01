@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: 'Nomor meja wajib diisi.' }, { status: 422 })
     }
     if (!VALID_TABLE_NAMES.has(nomorMeja)) {
-      return NextResponse.json({ success: false, message: 'Nomor meja harus Meja 1-15, Lesehan 1-11, atau Bungkus.' }, { status: 422 })
+      return NextResponse.json({ success: false, message: 'Nomor meja harus Meja 1-50, Lesehan 1-50, atau Bungkus.' }, { status: 422 })
     }
 
     const rawOrderId = body.orderId

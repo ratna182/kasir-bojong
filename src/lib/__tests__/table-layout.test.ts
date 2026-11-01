@@ -2,6 +2,14 @@ import { describe, expect, it } from 'vitest'
 import { TABLE_LIMITS, buildTableName } from '../table-layout'
 
 describe('buildTableName', () => {
+  it('allows up to 50 meja and 50 lesehan', () => {
+    expect(TABLE_LIMITS.Meja).toBe(50)
+    expect(TABLE_LIMITS.Lesehan).toBe(50)
+    expect(buildTableName('Meja', 50)).toBe('Meja 50')
+    expect(buildTableName('Lesehan', 50)).toBe('Lesehan 50')
+    expect(buildTableName('Meja', 51)).toBeNull()
+    expect(buildTableName('Lesehan', 51)).toBeNull()
+  })
   it('builds a table name from a typed number', () => {
     expect(buildTableName('Meja', '7')).toBe('Meja 7')
     expect(buildTableName('Lesehan', 3)).toBe('Lesehan 3')
