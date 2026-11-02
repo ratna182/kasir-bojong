@@ -65,11 +65,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, errors: { password: 'Password minimal 6 karakter.' } }, { status: 422 })
     }
 
-    const kasirCount = await prisma.user.count({ where: { role: 'KASIR' } })
-    if (kasirCount >= 2) {
+    // ponytail: count-then-create race window; wrap in serializable tx if concurrent owners matter
+    const kasirCount = await prisma.user.count({ where: { role: 'KASIR', warungId } })
+    if (kasirCount >= 3) {
       return NextResponse.json({
         success: false,
-        message: 'Maksimal 2 akun kasir sudah tercapai.',
+        message: 'Maksimal 3 akun kasir sudah tercapai.',
       }, { status: 409 })
     }
 
@@ -105,10 +106,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, data: user }, { status: 201 })
   } catch (error) {
-    if (error instanceof Error && error.message.includes('Maksimal 2 akun kasir')) {
+    if (error instanceof Error && error.message.includes('Maksimal 3 akun kasir')) {
       return NextResponse.json({
         success: false,
-        message: 'Maksimal 2 akun kasir sudah tercapai.',
+        message: 'Maksimal 3 akun kasir sudah tercapai.',
       }, { status: 409 })
     }
     console.error('[POST /api/users]', error)

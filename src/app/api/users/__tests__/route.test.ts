@@ -139,21 +139,22 @@ describe('Users API', () => {
       expect(data.success).toBe(false)
     })
 
-    it('should return 409 when two cashiers already exist', async () => {
+    it('should return 409 when three cashiers already exist in the warung', async () => {
       vi.mocked(getAuthContext).mockReturnValue({ user: { id: '1', role: 'OWNER' } } as any)
       vi.mocked(requireRole).mockReturnValue(null)
-      vi.mocked(prisma.user.count).mockResolvedValue(2)
+      vi.mocked(prisma.user.count).mockResolvedValue(3)
 
       const request = new NextRequest('http://localhost/api/users', {
         method: 'POST',
-        body: JSON.stringify({ warungId: 'warung1', username: 'kasir3', password: 'password123' }),
+        body: JSON.stringify({ warungId: 'warung1', username: 'kasir4', password: 'password123' }),
       })
 
       const response = await POST(request)
       const data = await response.json()
 
       expect(response.status).toBe(409)
-      expect(data.message).toContain('Maksimal 2 akun kasir')
+      expect(data.message).toContain('Maksimal 3 akun kasir')
+      expect(prisma.user.count).toHaveBeenCalledWith({ where: { role: 'KASIR', warungId: 'warung1' } })
       expect(prisma.user.create).not.toHaveBeenCalled()
     })
   })

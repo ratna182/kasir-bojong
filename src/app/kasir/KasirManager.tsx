@@ -354,7 +354,15 @@ export default function KasirManager({ warungs, userRole }: KasirManagerProps) {
               <button type="button" onClick={() => handleToggleAll(false)} disabled={togglingAll} className="btn btn-danger">Nonaktifkan Semua Kasir</button>
             </>
           )}
-          <button type="button" onClick={() => handleOpenForm()} className="btn btn-primary"><Plus size={16} /> Tambah Kasir</button>
+          <button
+            type="button"
+            onClick={() => handleOpenForm()}
+            className="btn btn-primary"
+            disabled={users.length >= 3}
+            title={users.length >= 3 ? 'Maksimal 3 kasir per cabang' : undefined}
+          >
+            <Plus size={16} /> Tambah Kasir
+          </button>
         </div>
       </div>
 
