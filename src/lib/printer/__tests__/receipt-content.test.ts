@@ -129,6 +129,16 @@ describe('buildReceiptLines', () => {
     expect(texts.some((line) => line.includes('Terimakasih'))).toBe(false)
   })
 
+  it('places the brand directly above the address without a Cabang line', () => {
+    const texts = textsOf(makeReceipt({}, { warungAlamat: 'Jl. Raya Bojong Kulur No.28' }))
+    const brandIndex = texts.findIndex((line) => line.includes(BRAND_NAME))
+    const addressIndex = texts.findIndex((line) => line.includes('Jl. Raya Bojong Kulur No.28'))
+
+    expect(brandIndex).toBeGreaterThanOrEqual(0)
+    expect(addressIndex).toBe(brandIndex + 1)
+    expect(texts.some((line) => line.includes('Cabang :'))).toBe(false)
+  })
+
   it('marks reprints above the shop name', () => {
     const texts = textsOf(makeReceipt({}, { reprint: true }))
     expect(texts.findIndex((line) => line.includes('CETAK ULANG'))).toBeLessThan(

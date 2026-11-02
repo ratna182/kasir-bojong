@@ -1,8 +1,6 @@
 import {
   BRAND_NAME,
   CONTACT_WA,
-  formatBranchLine,
-  RECEIPT_BRANCH_NAME,
   SOCIAL_LINES,
 } from '@/lib/branch-config'
 import { centerText, fitScale, rightText, wrapText, type Scale } from './layout'
@@ -107,7 +105,6 @@ export function buildReceiptLines(receipt: ReceiptData, width: number): ReceiptL
   if (receipt.reprint) centered('*** CETAK ULANG STRUK RESMI ***')
 
   centered(BRAND_NAME, 2)
-  centered(formatBranchLine(RECEIPT_BRANCH_NAME))
   if (receipt.warungAlamat) centered(receipt.warungAlamat)
   for (const social of SOCIAL_LINES) centered(social)
 

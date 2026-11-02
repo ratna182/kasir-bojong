@@ -10,7 +10,7 @@ export const DEFAULT_BRANCH_NAME =
 export const DEFAULT_BRANCH_KODE =
   process.env.NEXT_PUBLIC_BRANCH_KODE?.trim() || 'BJK-1'
 
-export const CONTACT_WA = process.env.NEXT_PUBLIC_CONTACT_WA?.trim() || ''
+export const CONTACT_WA = process.env.NEXT_PUBLIC_CONTACT_WA?.trim() || '0852-8000-4508'
 
 /** Label cabang yang dicetak di header struk, terpisah dari nama warung di database. */
 export const RECEIPT_BRANCH_NAME =
