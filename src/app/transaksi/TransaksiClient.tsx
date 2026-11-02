@@ -14,7 +14,7 @@ import { printer } from '@/lib/printer'
 import { loadPrinterConfig } from '@/lib/printer/storage'
 import { encodeReceipt } from '@/lib/printer/receipt-encoder'
 import { hitungKembalian, generateQuickAmounts } from '@/lib/payment/cash'
-import { QUICK_TABLES, LESEHAN, TABLE_LIMITS, buildTableName, type TableKind } from '@/lib/table-layout'
+import { QUICK_TABLES, LESEHAN, TABLE_LIMITS, TABLE_ROWS, buildTableName, type TableKind, type TableRow } from '@/lib/table-layout'
 import { sortByName } from '@/lib/menu-sort'
 
 interface Menu {
@@ -109,6 +109,7 @@ export default function TransaksiClient({ session, menus: initialMenus, initialA
   const [nomorMeja, setNomorMeja] = useState('')
   const [showTablePicker, setShowTablePicker] = useState(false)
   const [tableKind, setTableKind] = useState<TableKind | 'Bungkus'>('Meja')
+  const [tableRow, setTableRow] = useState<TableRow>('A')
   const [tableNumber, setTableNumber] = useState('')
   const [tablePickerError, setTablePickerError] = useState('')
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null)
@@ -239,13 +240,16 @@ export default function TransaksiClient({ session, menus: initialMenus, initialA
   }
 
   function openTablePicker() {
-    const match = /^(Meja|Lesehan)\s+(\d+)$/.exec(nomorMeja.trim())
-    if (match) {
-      setTableKind(match[1] as TableKind)
-      setTableNumber(match[2])
+    const withRow = /^(Meja|Lesehan)\s+([A-E])\s+(\d+)$/i.exec(nomorMeja.trim())
+    if (withRow) {
+      setTableKind(withRow[1] as TableKind)
+      setTableRow(withRow[2].toUpperCase() as TableRow)
+      setTableNumber(withRow[3])
     } else {
-      setTableKind('Meja')
-      setTableNumber('')
+      const legacy = /^(Meja|Lesehan)\s+(\d+)$/i.exec(nomorMeja.trim())
+      setTableKind(legacy ? (legacy[1] as TableKind) : 'Meja')
+      setTableRow('A')
+      setTableNumber(legacy ? legacy[2] : '')
     }
     setTablePickerError('')
     setShowTablePicker(true)
@@ -259,7 +263,7 @@ export default function TransaksiClient({ session, menus: initialMenus, initialA
       setShowTablePicker(false)
       return
     }
-    const value = buildTableName(tableKind, tableNumber)
+    const value = buildTableName(tableKind, tableRow, tableNumber)
     if (!value) {
       setTablePickerError(`Nomor ${tableKind} harus 1-${TABLE_LIMITS[tableKind]}.`)
       return
@@ -1257,19 +1261,40 @@ export default function TransaksiClient({ session, menus: initialMenus, initialA
             </div>
 
             {tableKind !== 'Bungkus' && (
-              <input
-                autoFocus
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                autoComplete="off"
-                className="form-input"
-                placeholder={`Nomor ${tableKind} (1-${TABLE_LIMITS[tableKind]})`}
-                value={tableNumber}
-                onChange={(event) => { setTableNumber(event.target.value.replace(/[^0-9]/g, '')); setTablePickerError('') }}
-                style={{ width: '100%', fontSize: '1.5rem', textAlign: 'center', letterSpacing: '0.1em', marginBottom: '0.35rem' }}
-                aria-label={`Nomor ${tableKind}`}
-              />
+              <>
+                <div style={{ display: 'flex', gap: '0.35rem', marginBottom: '0.75rem' }}>
+                  {TABLE_ROWS.map((row) => (
+                    <button
+                      key={row}
+                      type="button"
+                      onClick={() => { setTableRow(row); setTablePickerError('') }}
+                      className="btn btn-sm"
+                      style={{
+                        flex: 1, minHeight: '44px', justifyContent: 'center',
+                        border: '1px solid var(--color-border)',
+                        background: tableRow === row ? 'var(--color-brand)' : 'var(--color-surface-raised)',
+                        color: tableRow === row ? '#fff' : 'var(--color-text-secondary)',
+                      }}
+                      aria-label={`Baris ${row}`}
+                    >
+                      {row}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  autoFocus
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  autoComplete="off"
+                  className="form-input"
+                  placeholder={`Nomor ${tableKind} baris ${tableRow} (1-${TABLE_LIMITS[tableKind]})`}
+                  value={tableNumber}
+                  onChange={(event) => { setTableNumber(event.target.value.replace(/[^0-9]/g, '')); setTablePickerError('') }}
+                  style={{ width: '100%', fontSize: '1.5rem', textAlign: 'center', letterSpacing: '0.1em', marginBottom: '0.35rem' }}
+                  aria-label={`Nomor ${tableKind} baris ${tableRow}`}
+                />
+              </>
             )}
 
             {tablePickerError && (
