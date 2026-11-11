@@ -22,16 +22,21 @@ export default async function TransaksiPage() {
   const ownerWarung = session.role === 'OWNER'
     ? await prisma.warung.findUnique({ where: { kode: DEFAULT_BRANCH_KODE }, select: { id: true, nama: true, kode: true, alamat: true } })
     : null
-  const activeSession = ownerWarung
-    ? { ...session, warungId: ownerWarung.id, warungNama: ownerWarung.nama, warungKode: ownerWarung.kode, warungAlamat: ownerWarung.alamat }
-    : session
+  const warung = ownerWarung ?? (session.warungId
+    ? await prisma.warung.findUnique({ where: { id: session.warungId }, select: { id: true, nama: true, kode: true, alamat: true } })
+    : null)
 
-  if (!activeSession.warungId) redirect('/login')
+  if (!warung) redirect('/login')
 
-  const warung = !ownerWarung ? await prisma.warung.findUnique({ where: { id: activeSession.warungId }, select: { alamat: true } }) : null
-  const warungAlamat = ownerWarung?.alamat ?? warung?.alamat ?? null
+  const activeSession = {
+    ...session,
+    warungId: warung.id,
+    warungNama: warung.nama,
+    warungKode: warung.kode,
+    warungAlamat: warung.alamat,
+  }
 
-  const kasirState = await getKasirSessionState(prisma, activeSession.warungId, activeSession.id)
+  const kasirState = await getKasirSessionState(prisma, warung.id, activeSession.id)
 
   const [menus, warungMenus, activeOrders] = await Promise.all([
     prisma.menu.findMany({
@@ -99,11 +104,11 @@ export default async function TransaksiPage() {
 
   return (
     <div className="app-container">
-      <Navbar session={session} activePage="transaksi" />
+      <Navbar session={activeSession} activePage="transaksi" />
       <div className="content-area">
         <AutoRefresh intervalMs={15000} />
         <TransaksiClient
-          session={{ ...activeSession, warungAlamat }}
+          session={activeSession}
           menus={serializedMenus}
           initialActiveOrders={serializedActiveOrders}
           isKasirClosed={!kasirState.shift}
