@@ -250,7 +250,7 @@ export default async function DashboardPage() {
         {openShift ? (
           <div className="alert alert-success" style={{ marginBottom: '1.5rem' }}>
             <div>
-              <strong>Kasir Buka</strong>
+              <strong>Kasir Buka — Shift {openShift.nomor}</strong>
               <p style={{ margin: 0, fontSize: '0.8rem' }}>
                 Buka {formatWibDateTime(openShift.dibukaPada)} WIB oleh {openShift.dibukaOleh}. Siap menerima pesanan.
               </p>
@@ -259,7 +259,7 @@ export default async function DashboardPage() {
         ) : latestShift ? (
           <div className="alert alert-warning" style={{ marginBottom: '1.5rem' }}>
             <div>
-              <strong>Shift Terakhir Sudah Ditutup</strong>
+              <strong>Shift {latestShift.nomor} Terakhir Sudah Ditutup</strong>
               <p style={{ margin: 0, fontSize: '0.8rem' }}>
                 {formatWibShiftRange(latestShift.dibukaPada, latestShift.ditutupPada)}.
                 Buka shift baru untuk mulai bertransaksi lagi.

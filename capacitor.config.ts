@@ -10,7 +10,7 @@ const allowedHost = new URL(serverUrl).hostname
 
 const config: CapacitorConfig = {
   appId: process.env.CAPACITOR_APP_ID || 'id.kasirbojongkulur.kasir',
-  appName: process.env.CAPACITOR_APP_NAME || 'Kasir Bojong Kulur',
+  appName: process.env.CAPACITOR_APP_NAME || 'Kasir Pinang Ranti',
   webDir: 'www',
   server: serverUrl ? { url: serverUrl, androidScheme: 'https', allowNavigation: [allowedHost] } : undefined,
   loggingBehavior: 'production',

@@ -1,18 +1,18 @@
 # Panduan Uji APK di Mesin iMin
 
-Dokumen ini untuk memastikan APK **Kasir Bojong Kulur** terpasang dan semua fungsi berjalan di mesin kasir iMin.
+Dokumen ini untuk memastikan APK **Kasir Pinang Ranti** terpasang dan semua fungsi berjalan di mesin kasir iMin.
 
 ## Identitas APK
 
 | Item | Nilai |
 |---|---|
-| Nama aplikasi | Kasir Bojong Kulur |
+| Nama aplikasi | Kasir Pinang Ranti |
 | Package | `id.kasirbojongkulur.kasir` |
 | Versi | 1.5.1 (versionCode 10) |
 | Server | `https://kasir-bojongkulur.vercel.app` |
 | Printer | Bluetooth SPP (`SppPrinter`), bukan iMin SDK |
 
-Catatan: aplikasi ini **terpisah** dari "Kasir Vian Jaya 08". Keduanya bisa terpasang bersamaan.
+Catatan: aplikasi ini adalah build kasir untuk outlet Pinang Ranti.
 
 ## Prasyarat
 
@@ -48,8 +48,8 @@ Centang satu per satu. Kalau ada yang gagal, catat langkah nomornya.
    ```
    LOGO
    Seafood Vian Jaya 08
-   Cabang : Seafood Vian Jaya 08 (Bojongkulur)
-   Jl. Raya Bojong Kulur No.28
+   Seafood Vian Jaya 08 Pinang Ranti (Pusat)
+   Jalan Raya Pondok Gede No. 11
    IG : Seafoodvianjaya.id
    FB : Seafoodvianjaya
    TT : Seafoodvianjaya

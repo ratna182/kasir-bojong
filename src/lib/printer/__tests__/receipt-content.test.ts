@@ -129,13 +129,18 @@ describe('buildReceiptLines', () => {
     expect(texts.some((line) => line.includes('Terimakasih'))).toBe(false)
   })
 
-  it('places the brand directly above the address without a Cabang line', () => {
-    const texts = textsOf(makeReceipt({}, { warungAlamat: 'Jl. Raya Bojong Kulur No.28' }))
+  it('places the outlet name below the brand and above the address without a Cabang line', () => {
+    const texts = textsOf(makeReceipt({}, {
+      warungNama: 'Seafood Vian Jaya 08 Pinang Ranti (Pusat)',
+      warungAlamat: 'Jalan Raya Pondok Gede No. 11',
+    }))
     const brandIndex = texts.findIndex((line) => line.includes(BRAND_NAME))
-    const addressIndex = texts.findIndex((line) => line.includes('Jl. Raya Bojong Kulur No.28'))
+    const outletIndex = texts.findIndex((line) => line.includes('Pinang Ranti'))
+    const addressIndex = texts.findIndex((line) => line.includes('Jalan Raya Pondok Gede No. 11'))
 
     expect(brandIndex).toBeGreaterThanOrEqual(0)
-    expect(addressIndex).toBe(brandIndex + 1)
+    expect(outletIndex).toBeGreaterThan(brandIndex)
+    expect(addressIndex).toBeGreaterThan(outletIndex)
     expect(texts.some((line) => line.includes('Cabang :'))).toBe(false)
   })
 

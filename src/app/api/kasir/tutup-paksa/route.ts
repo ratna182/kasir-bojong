@@ -94,6 +94,7 @@ export async function POST(request: NextRequest) {
       message: `Shift ditutup paksa pada ${formatWibDateTime(closedAt)} WIB.`,
       data: {
         shiftId: result.shift.id,
+        nomor: result.shift.nomor,
         ditutupPada: result.shift.ditutupPada?.toISOString() ?? closedAt.toISOString(),
         cancelledOrders: result.cancelledOrders,
         totalTransaksi: result.totalTransaksi,

@@ -33,8 +33,10 @@ export async function GET(request: NextRequest) {
       data: {
         hariIni: getStoreDateKey(),
         sudahTutup: state.isClosed,
+        nextNomor: state.nextNomor,
         shift: shift ? {
           id: shift.id,
+          nomor: shift.nomor,
           dibukaPada: shift.dibukaPada?.toISOString() ?? null,
           ditutupPada: shift.ditutupPada?.toISOString() ?? null,
           dibukaOleh: personName(shift.pembuka),
@@ -46,6 +48,7 @@ export async function GET(request: NextRequest) {
         } : null,
         latestShift: latest ? {
           id: latest.id,
+          nomor: latest.nomor,
           status: latest.status,
           dibukaPada: latest.dibukaPada?.toISOString() ?? null,
           ditutupPada: latest.ditutupPada?.toISOString() ?? null,

@@ -107,6 +107,7 @@ export async function POST(request: NextRequest) {
       success: true,
       data: {
         shiftId: result.shift.id,
+        nomor: result.shift.nomor,
         dibukaPada: result.shift.dibukaPada?.toISOString() ?? null,
         ditutupPada: result.shift.ditutupPada?.toISOString() ?? closedAt.toISOString(),
         totalTransaksi: result.totalTransaksi,

@@ -1,13 +1,13 @@
 # Rilis APK & Backup
 
-Prosedur rilis APK Kasir Bojong Kulur, termasuk signing di CI dan backup keystore.
+Prosedur rilis APK Kasir Pinang Ranti, termasuk signing di CI dan backup keystore.
 
 ## Identitas Rilis
 
 | Item | Nilai |
 |---|---|
 | Package | `id.kasirbojongkulur.kasir` |
-| Nama | Kasir Bojong Kulur |
+| Nama | Kasir Pinang Ranti |
 | Certificate | `CN=Kasir Bojong Kulur, OU=POS, O=Bojong Kulur, L=Bogor, ST=Jawa Barat, C=ID` |
 | SHA-256 sertifikat | `DD:4D:CC:D4:7F:E2:45:1E:9A:77:4E:98:4A:75:6A:7E:E0:2C:A4:FF:85:C2:0C:89:CC:DB:3F:D9:D9:97:77:4E` |
 | Keystore | `android/kasir-bojongkulur-release.jks` (alias `kasirbojongkulur`, PKCS12) |

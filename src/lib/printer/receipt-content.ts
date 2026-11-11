@@ -105,6 +105,7 @@ export function buildReceiptLines(receipt: ReceiptData, width: number): ReceiptL
   if (receipt.reprint) centered('*** CETAK ULANG STRUK RESMI ***')
 
   centered(BRAND_NAME, 2)
+  if (receipt.warungNama && receipt.warungNama !== BRAND_NAME) centered(receipt.warungNama)
   if (receipt.warungAlamat) centered(receipt.warungAlamat)
   for (const social of SOCIAL_LINES) centered(social)
 

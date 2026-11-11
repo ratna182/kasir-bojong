@@ -169,6 +169,7 @@ model KasirSesi {
 model KasirShift {
   id           String       @id @default(uuid())
   warungId     String       @map("warung_id")
+  nomor        Int          @default(1)
   dibukaOleh   String       @map("dibuka_oleh")
   ditutupOleh  String?      @map("ditutup_oleh")
   dibukaPada   DateTime?    @map("dibuka_pada") @db.Timestamptz(3)
@@ -187,6 +188,7 @@ model KasirShift {
 
   @@index([warungId, status])
   @@index([warungId, dibukaPada])
+  @@index([warungId, nomor])
   @@map("kasir_shifts")
 }
 

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { getAuthContext, requireKasirAccess } from '@/lib/auth'
-import { getOpenShift } from '@/lib/kasir-shift'
+import { getNextShiftNumber, getOpenShift } from '@/lib/kasir-shift'
 import { recordActivity } from '@/lib/activity-log'
 import { apiRateLimiter } from '@/lib/rate-limiter'
 
@@ -35,9 +35,11 @@ export async function POST(request: NextRequest) {
       const open = await getOpenShift(tx, warungId)
       if (open) return { type: 'ALREADY_OPEN' as const, open }
 
+      const nomor = await getNextShiftNumber(tx, warungId)
       const shift = await tx.kasirShift.create({
         data: {
           warungId,
+          nomor,
           dibukaOleh: userId,
           dibukaPada: openedAt,
           status: 'TERBUKA',
@@ -76,8 +78,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'Kasir berhasil dibuka.',
-      data: { shiftId: result.shift.id, dibukaPada: openedAt },
+      message: `Shift ${result.shift.nomor} berhasil dibuka.`,
+      data: { shiftId: result.shift.id, nomor: result.shift.nomor, dibukaPada: openedAt },
     })
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && (error.code === 'P2034' || error.code === 'P2002')) {

@@ -3,6 +3,7 @@ import { getStoreDayRange } from './time'
 
 export const SHIFT_WARNING_HOURS = 18
 export const SHIFT_WARNING_MS = SHIFT_WARNING_HOURS * 60 * 60 * 1000
+export const SHIFT_CYCLE_SIZE = 3
 
 export type ShiftDb = Pick<Prisma.TransactionClient, 'kasirShift' | 'kasirShiftEvent' | 'transaksi'>
 
@@ -14,6 +15,7 @@ export interface ShiftPerson {
 export interface ShiftSummary {
   id: string
   warungId: string
+  nomor: number
   status: 'TERBUKA' | 'DITUTUP'
   dibukaPada: Date | null
   ditutupPada: Date | null
@@ -30,6 +32,7 @@ export interface ShiftSummary {
 interface ShiftRow {
   id: string
   warungId: string
+  nomor: number
   status: 'TERBUKA' | 'DITUTUP'
   dibukaPada: Date | null
   ditutupPada: Date | null
@@ -52,6 +55,7 @@ export function toShiftSummary(row: ShiftRow): ShiftSummary {
   return {
     id: row.id,
     warungId: row.warungId,
+    nomor: row.nomor,
     status: row.status,
     dibukaPada: row.dibukaPada,
     ditutupPada: row.ditutupPada,
@@ -68,6 +72,16 @@ export function toShiftSummary(row: ShiftRow): ShiftSummary {
 
 export function personName(person: ShiftPerson | null | undefined): string {
   return person?.namaLengkap || person?.username || '-'
+}
+
+/** Nomor shift berikutnya: 1 -> 2 -> 3 -> 1, tanpa reset harian. */
+export function nextShiftNumber(current: number | null | undefined): number {
+  if (!current || !Number.isInteger(current) || current < 1) return 1
+  return (current % SHIFT_CYCLE_SIZE) + 1
+}
+
+export function shiftLabel(nomor: number): string {
+  return `Shift ${nomor}`
 }
 
 export function shiftDurationHours(shift: { dibukaPada: Date | null; ditutupPada?: Date | null }, now = new Date()): number {
@@ -100,6 +114,15 @@ export async function getLatestShift(db: ShiftDb, warungId: string) {
   })
 }
 
+export async function getNextShiftNumber(db: ShiftDb, warungId: string): Promise<number> {
+  const latest = await db.kasirShift.findFirst({
+    where: { warungId },
+    orderBy: [{ dibukaPada: 'desc' }, { createdAt: 'desc' }],
+    select: { nomor: true },
+  })
+  return nextShiftNumber(latest?.nomor)
+}
+
 export async function getKasirSessionState(
   db: ShiftDb,
   warungId: string,
@@ -119,6 +142,7 @@ export async function getKasirSessionState(
     today,
     tomorrow,
     latest,
+    nextNomor: nextShiftNumber(latest?.nomor),
     shift: open,
     openShift: open,
     isClosed,

@@ -2,10 +2,10 @@ export const BRAND_NAME =
   process.env.NEXT_PUBLIC_BRAND_NAME?.trim() || 'Seafood Vian Jaya 08'
 
 export const STORE_NAME =
-  process.env.NEXT_PUBLIC_STORE_NAME?.trim() || 'Seafood Vian Jaya 08 (Bojongkulur)'
+  process.env.NEXT_PUBLIC_STORE_NAME?.trim() || 'Seafood Vian Jaya 08 Pinang Ranti (Pusat)'
 
 export const DEFAULT_BRANCH_NAME =
-  process.env.NEXT_PUBLIC_BRANCH_NAME?.trim() || `${STORE_NAME} - Cabang 1`
+  process.env.NEXT_PUBLIC_BRANCH_NAME?.trim() || 'Pinang Ranti (Pusat)'
 
 export const DEFAULT_BRANCH_KODE =
   process.env.NEXT_PUBLIC_BRANCH_KODE?.trim() || 'BJK-1'
@@ -14,7 +14,7 @@ export const CONTACT_WA = process.env.NEXT_PUBLIC_CONTACT_WA?.trim() || '0852-80
 
 /** Label cabang yang dicetak di header struk, terpisah dari nama warung di database. */
 export const RECEIPT_BRANCH_NAME =
-  process.env.NEXT_PUBLIC_RECEIPT_BRANCH_NAME?.trim() || 'Seafood Vian Jaya 08 (Bojongkulur)'
+  process.env.NEXT_PUBLIC_RECEIPT_BRANCH_NAME?.trim() || 'Seafood Vian Jaya 08 Pinang Ranti (Pusat)'
 
 const socialHandles: Array<[string, string | undefined]> = [
   ['IG', process.env.NEXT_PUBLIC_INSTAGRAM ?? 'Seafoodvianjaya.id'],

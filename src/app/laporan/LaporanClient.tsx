@@ -73,6 +73,7 @@ interface LaporanDataLocal {
 
 interface ShiftStatus {
   id: string
+  nomor: number
   dibukaPada: string | null
   ditutupPada: string | null
   dibukaOleh: string
@@ -199,7 +200,10 @@ export default function LaporanClient({ warungId, warungNama, warungs, role, ini
       })
       const result = await res.json()
       if (result.success) {
-        setFeedback({ type: 'success', message: 'Shift kasir berhasil dibuka.' })
+        setFeedback({
+          type: 'success',
+          message: result.data?.nomor ? `Shift ${result.data.nomor} berhasil dibuka.` : 'Shift berhasil dibuka.',
+        })
         await Promise.all([fetchStatus(), fetchLaporan()])
       } else {
         setFeedback({ type: 'error', message: result.message || 'Gagal membuka kasir' })
@@ -290,6 +294,7 @@ export default function LaporanClient({ warungId, warungNama, warungs, role, ini
   const hasReport = Boolean(data && (data.shifts.length > 0 || data.rekap.length > 0))
   const openDuration = openShift?.durationHours ?? 0
   const isOvertime = Boolean(openShift?.overtime)
+  const nextNomor = latestShift ? (latestShift.nomor % 3) + 1 : 1
   const summary = resolveLaporanSummary(data, openShift, tanggal)
   const summaryTitle = summary?.scope === 'SHIFT' ? 'Ringkasan Shift Aktif' : 'Ringkasan Harian'
 
@@ -347,11 +352,11 @@ export default function LaporanClient({ warungId, warungNama, warungs, role, ini
           <PrinterStatusBadge onSetupClick={() => setShowPrinterSetup(true)} />
           {openShift ? (
             <button type="button" onClick={() => setShowCloseModal(true)} disabled={loading} className="btn btn-danger" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Lock size={16} /> Tutup Shift
+              <Lock size={16} /> Tutup Shift {openShift.nomor}
             </button>
           ) : (
             <button type="button" onClick={handleBukaKasir} disabled={opening} className="btn btn-success" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Unlock size={16} /> {opening ? 'Membuka...' : 'Buka Shift Baru'}
+              <Unlock size={16} /> {opening ? 'Membuka...' : `Buka Shift ${nextNomor}`}
             </button>
           )}
         </div>
@@ -377,7 +382,7 @@ export default function LaporanClient({ warungId, warungNama, warungs, role, ini
       {openShift ? (
         <div className="alert alert-success no-print" style={{ marginBottom: '1.5rem' }}>
           <div>
-            <strong>Status Kasir: BUKA</strong>
+            <strong>Status Kasir: BUKA — Shift {openShift.nomor}</strong>
             <p style={{ margin: 0, fontSize: '0.85rem' }}>
               Dibuka {formatWibDateTime(openShift.dibukaPada)} WIB oleh <strong>{openShift.dibukaOleh}</strong> • durasi {formatDuration(openDuration)}
             </p>
@@ -388,7 +393,7 @@ export default function LaporanClient({ warungId, warungNama, warungs, role, ini
           <div>
             <strong>Status Kasir: DITUTUP</strong>
             <p style={{ margin: 0, fontSize: '0.85rem' }}>
-              Shift terakhir: {formatWibShiftRange(latestShift.dibukaPada, latestShift.ditutupPada)}
+              Shift {latestShift.nomor} terakhir: {formatWibShiftRange(latestShift.dibukaPada, latestShift.ditutupPada)}
               {latestShift.ditutupOleh ? ` oleh ${latestShift.ditutupOleh}` : ''}.
             </p>
           </div>

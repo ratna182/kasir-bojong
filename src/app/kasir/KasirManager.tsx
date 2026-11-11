@@ -25,6 +25,7 @@ interface KasirManagerProps {
 
 interface ShiftInfo {
   id: string
+  nomor: number
   status?: 'TERBUKA' | 'DITUTUP'
   dibukaPada: string | null
   ditutupPada: string | null
@@ -305,6 +306,9 @@ export default function KasirManager({ warungs, userRole }: KasirManagerProps) {
     }
   }
 
+  const nextNomor = latestShift ? (latestShift.nomor % 3) + 1 : 1
+  const atCashierLimit = users.length >= 3
+
   async function handleDelete(user: KasirUser) {
     if (!confirm(`Hapus kasir "${user.username}"?`)) return
 
@@ -330,17 +334,22 @@ export default function KasirManager({ warungs, userRole }: KasirManagerProps) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
         <div>
           <h1 style={{ fontSize: '1.75rem', marginBottom: '4px' }}>Manajemen Kasir</h1>
-          <p className="text-secondary text-sm">Kelola akun kasir untuk setiap outlet</p>
+          <p className="text-secondary text-sm">Kelola akun kasir untuk outlet</p>
+          {atCashierLimit && (
+            <p className="text-secondary text-sm" style={{ marginTop: 4 }}>
+              Maksimal 3 akun kasir sudah tercapai.
+            </p>
+          )}
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
           {!openShift && (
             <button type="button" onClick={handleOpenKasir} disabled={openingKasir} className="btn btn-success">
-              {openingKasir ? 'Membuka...' : 'Buka Kasir'}
+              {openingKasir ? 'Membuka...' : `Buka Shift ${nextNomor}`}
             </button>
           )}
           {openShift && (
             <button type="button" onClick={handleTutupKasir} disabled={closingKasir} className="btn btn-danger">
-              {closingKasir ? 'Menutup...' : 'Tutup Shift'}
+              {closingKasir ? 'Menutup...' : `Tutup Shift ${openShift.nomor}`}
             </button>
           )}
           {userRole === 'OWNER' && openShift && (
@@ -354,13 +363,7 @@ export default function KasirManager({ warungs, userRole }: KasirManagerProps) {
               <button type="button" onClick={() => handleToggleAll(false)} disabled={togglingAll} className="btn btn-danger">Nonaktifkan Semua Kasir</button>
             </>
           )}
-          <button
-            type="button"
-            onClick={() => handleOpenForm()}
-            className="btn btn-primary"
-            disabled={users.length >= 3}
-            title={users.length >= 3 ? 'Maksimal 3 kasir per cabang' : undefined}
-          >
+          <button type="button" onClick={() => handleOpenForm()} disabled={atCashierLimit} className="btn btn-primary" title={atCashierLimit ? 'Maksimal 3 akun kasir sudah tercapai' : undefined}>
             <Plus size={16} /> Tambah Kasir
           </button>
         </div>
@@ -393,7 +396,7 @@ export default function KasirManager({ warungs, userRole }: KasirManagerProps) {
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
               <div>
-                <strong>Shift Buka</strong>
+                <strong>Shift {openShift.nomor} Buka</strong>
                 <p className="text-sm text-secondary" style={{ margin: 0 }}>
                   {formatWibShiftRange(openShift.dibukaPada, openShift.ditutupPada)} • oleh {openShift.dibukaOleh}
                 </p>
@@ -418,7 +421,7 @@ export default function KasirManager({ warungs, userRole }: KasirManagerProps) {
           </div>
         ) : latestShift ? (
           <div>
-            <strong>Shift Terakhir Ditutup</strong>
+            <strong>Shift Terakhir Ditutup (Shift {latestShift.nomor})</strong>
             <p className="text-sm text-secondary" style={{ margin: 0 }}>
               {formatWibShiftRange(latestShift.dibukaPada, latestShift.ditutupPada)}
               {latestShift.ditutupOleh ? ` oleh ${latestShift.ditutupOleh}` : ''} • {latestShift.totalTransaksi} transaksi

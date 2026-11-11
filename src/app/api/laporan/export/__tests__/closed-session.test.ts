@@ -30,6 +30,7 @@ describe('Financial report export', () => {
   const shift = {
     id: 'shift1',
     warungId: 'warung1',
+    nomor: 1,
     status: 'TERBUKA',
     dibukaPada: new Date('2026-09-14T01:00:00.000Z'),
     ditutupPada: null,

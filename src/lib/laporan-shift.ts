@@ -1,6 +1,6 @@
 import type { Prisma } from '@prisma/client'
 import { getStoreDayRangeForDateKey } from './time'
-import { isShiftOvertime, personName, shiftDurationHours } from './kasir-shift'
+import { isShiftOvertime, personName, shiftDurationHours, shiftLabel } from './kasir-shift'
 import { compareIndonesian } from './menu-sort'
 import { normalizeKategoriNama, TANPA_KATEGORI } from './kategori'
 
@@ -144,7 +144,7 @@ export async function buildLaporanHarian(
   const grand = emptyTotals()
   let grandTotalPendapatan = 0
 
-  shiftsRaw.forEach((shift, index) => {
+  shiftsRaw.forEach((shift) => {
     const totals = emptyTotals()
     for (const transaction of shift.transaksis as ShiftTransaction[]) {
       addTotals(totals, transaction)
@@ -156,7 +156,7 @@ export async function buildLaporanHarian(
         metodePembayaran: transaction.metodePembayaran || 'CASH',
         createdAt: transaction.createdAt.toISOString(),
         shiftId: shift.id,
-        shiftNomor: index + 1,
+        shiftNomor: shift.nomor,
       })
     }
     grand.totalCash += totals.totalCash
@@ -166,8 +166,8 @@ export async function buildLaporanHarian(
 
     shifts.push({
       id: shift.id,
-      nomor: index + 1,
-      label: `Shift ${index + 1}`,
+      nomor: shift.nomor,
+      label: shiftLabel(shift.nomor),
       status: shift.status,
       dibukaPada: shift.dibukaPada?.toISOString() ?? null,
       ditutupPada: shift.ditutupPada?.toISOString() ?? null,

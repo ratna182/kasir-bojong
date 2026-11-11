@@ -102,6 +102,7 @@ describe('Transaksi held order API', () => {
     vi.mocked(prisma.kasirShift.findFirst).mockResolvedValue({
       id: 'shift1',
       warungId: 'warung1',
+      nomor: 1,
       status: 'TERBUKA',
       dibukaPada: new Date('2026-09-14T05:00:00.000Z'),
       ditutupPada: null,

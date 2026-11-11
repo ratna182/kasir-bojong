@@ -26,10 +26,11 @@ import { getStoreDayRangeForDateKey } from '@/lib/time'
 
 const now = new Date('2026-09-14T04:00:00.000Z')
 
-function makeShift(id: string, openedAt: Date, closedAt: Date | null, transaksis: unknown[] = []) {
+function makeShift(id: string, openedAt: Date, closedAt: Date | null, transaksis: unknown[] = [], nomor = Number(id.replace('shift', '')) || 1) {
   return {
     id,
     warungId: 'warung1',
+    nomor,
     status: closedAt ? 'DITUTUP' : 'TERBUKA',
     dibukaPada: openedAt,
     ditutupPada: closedAt,

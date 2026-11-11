@@ -40,6 +40,7 @@ const context: AuthContext = {
 const shift = {
   id: 'shift1',
   warungId: 'warung1',
+  nomor: 1,
   status: 'TERBUKA' as const,
   dibukaPada: new Date('2026-10-28T01:00:00.000Z'),
   ditutupPada: null,

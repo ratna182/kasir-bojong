@@ -203,10 +203,14 @@ describe('encodeLaporan', () => {
   })
 
   it('wraps a branch name that is wider than the paper instead of clipping it', async () => {
-    const output = await encodeLaporan(DATA, 'Kasir', null, '80mm')
+    const longBranchData: LaporanData = {
+      ...DATA,
+      warung: { ...DATA.warung, nama: 'Seafood & Nasi Uduk Vian Jaya 08 - Cabang 2' },
+    }
+    const output = await encodeLaporan(longBranchData, 'Kasir', null, '80mm')
     const squashed = receiptLines(output).join('').replace(/\s+/g, '')
 
-    expect(squashed).toContain('Cabang:SeafoodVianJaya08-Cabang2')
+    expect(squashed).toContain('Cabang:Seafood&NasiUdukVianJaya08-Cabang2')
     expect(widestLine(output)).toBeLessThanOrEqual(48)
   })
 

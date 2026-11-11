@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Kasir Bojong Kulur</string>
-    <string name="title_activity_main">Kasir Bojong Kulur</string>
+    <string name="app_name">Kasir Pinang Ranti</string>
+    <string name="title_activity_main">Kasir Pinang Ranti</string>
     <string name="package_name">id.kasirbojongkulur.kasir</string>
     <string name="custom_url_scheme">id.kasirbojongkulur.kasir</string>
 </resources>

@@ -102,7 +102,7 @@ function createIdempotencyKey() {
 
 export default function TransaksiClient({ session, menus: initialMenus, initialActiveOrders, isKasirClosed, isShiftOvertime }: TransaksiClientProps) {
   const isKranggan = session.username.toLowerCase().includes('kranggan') || session.warungNama?.toLowerCase().includes('kranggan')
-  const isBojongKulur = !isKranggan
+  const isPinangRanti = !isKranggan
   const hasLesehan = session.username === 'kasir1' || isKranggan
   const quickTables = hasLesehan ? [...LESEHAN, TABLE_SECTION_GAP, ...QUICK_TABLES] : QUICK_TABLES
   const [cart, setCart] = useState<CartItem[]>([])
@@ -920,7 +920,7 @@ export default function TransaksiClient({ session, menus: initialMenus, initialA
             <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.4rem', color: 'var(--color-text-primary)' }}>
               Nomor Meja <span style={{ color: 'var(--color-danger)' }}>*</span>
             </label>
-            {isBojongKulur ? (
+            {isPinangRanti ? (
               <>
                 <button
                   type="button"
