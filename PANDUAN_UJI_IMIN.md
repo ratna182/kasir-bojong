@@ -1,16 +1,16 @@
 # Panduan Uji APK di Mesin iMin
 
-Dokumen ini untuk memastikan APK **Kasir Pinang Ranti** terpasang dan semua fungsi berjalan di mesin kasir iMin.
+Dokumen ini untuk memastikan APK **Pinang Ranti** terpasang dan semua fungsi berjalan di mesin kasir iMin.
 
 ## Identitas APK
 
 | Item | Nilai |
 |---|---|
-| Nama aplikasi | Kasir Pinang Ranti |
+| Nama aplikasi | Pinang Ranti |
 | Package | `id.kasirbojongkulur.kasir` |
-| Versi | 1.5.1 (versionCode 10) |
+| Versi | 1.5.3 (versionCode 12) |
 | Server | `https://kasir-bojongkulur.vercel.app` |
-| Printer | Bluetooth SPP (`SppPrinter`), bukan iMin SDK |
+| Printer | Bluetooth SPP, LAN, dan USB |
 
 Catatan: aplikasi ini adalah build kasir untuk outlet Pinang Ranti.
 
