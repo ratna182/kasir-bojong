@@ -8,7 +8,7 @@ Dokumen ini untuk memastikan APK **Pinang Ranti** terpasang dan semua fungsi ber
 |---|---|
 | Nama aplikasi | Pinang Ranti |
 | Package | `id.kasirbojongkulur.kasir` |
-| Versi | 1.5.3 (versionCode 12) |
+| Versi | 1.5.4 (versionCode 13) |
 | Server | `https://kasir-bojongkulur.vercel.app` |
 | Printer | Bluetooth SPP, LAN, dan USB |
 

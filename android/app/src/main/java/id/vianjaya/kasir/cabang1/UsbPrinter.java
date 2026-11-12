@@ -56,6 +56,7 @@ public final class UsbPrinter {
     private volatile String connectedDeviceName = "";
     private volatile boolean pendingPermission;
     private volatile boolean pendingGranted;
+    private volatile String pendingDeviceId = "";
     private volatile boolean receiverRegistered;
 
     private final BroadcastReceiver usbReceiver = new BroadcastReceiver() {
@@ -63,9 +64,14 @@ public final class UsbPrinter {
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
             if (ACTION_USB_PERMISSION.equals(action)) {
+                UsbDevice device = deviceFrom(intent);
                 boolean granted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false);
                 synchronized (permissionLock) {
-                    pendingGranted = granted;
+                    // Only accept a result for the device we actually asked about. The system
+                    // broadcast is the source of truth, so a spoofed broadcast cannot grant access.
+                    boolean matches = device != null
+                            && (pendingDeviceId.isEmpty() || pendingDeviceId.equals(device.getDeviceName()));
+                    pendingGranted = matches && granted;
                     pendingPermission = true;
                     permissionLock.notifyAll();
                 }
@@ -306,13 +312,19 @@ public final class UsbPrinter {
     private boolean ensurePermission(UsbDevice device) {
         if (manager == null) return false;
         if (manager.hasPermission(device)) return true;
-        return requestPermission(device);
+        if (!requestPermission(device)) return false;
+        // The grant can land a moment before UsbManager reflects it; give it a short window.
+        for (int attempt = 0; attempt < 10 && !manager.hasPermission(device); attempt++) {
+            sleep(100L);
+        }
+        return manager.hasPermission(device);
     }
 
     private boolean requestPermission(UsbDevice device) {
         synchronized (permissionLock) {
             pendingPermission = false;
             pendingGranted = false;
+            pendingDeviceId = device.getDeviceName();
             try {
                 Intent intent = new Intent(ACTION_USB_PERMISSION).setPackage(activity.getPackageName());
                 int flags = PendingIntent.FLAG_UPDATE_CURRENT;
@@ -336,6 +348,8 @@ public final class UsbPrinter {
             } catch (Throwable error) {
                 lastError = error.getMessage() == null ? NOT_READY_MESSAGE : error.getMessage();
                 return false;
+            } finally {
+                pendingDeviceId = "";
             }
         }
     }
@@ -371,7 +385,9 @@ public final class UsbPrinter {
             IntentFilter filter = new IntentFilter();
             filter.addAction(ACTION_USB_PERMISSION);
             filter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
-            ContextCompat.registerReceiver(activity, usbReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED);
+            // Android 14+ never delivers the UsbManager permission result to a NOT_EXPORTED
+            // receiver, so the grant dialog answers into the void and hasPermission stays false.
+            ContextCompat.registerReceiver(activity, usbReceiver, filter, ContextCompat.RECEIVER_EXPORTED);
             receiverRegistered = true;
         } catch (Throwable error) {
             lastError = error.getMessage() == null ? "Gagal mendaftarkan penerima USB" : error.getMessage();

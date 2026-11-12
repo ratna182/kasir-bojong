@@ -24,13 +24,13 @@ Prosedur rilis APK Pinang Ranti, termasuk signing di CI dan backup keystore.
    ```
 2. Bump versi di `android/app/build.gradle`:
    ```gradle
-   versionCode 12        // selalu naik
-   versionName "1.5.3"
+   versionCode 13        // selalu naik
+   versionName "1.5.4"
    ```
 3. Commit dan push ke `master`:
    ```powershell
    git add -A
-   git commit -m "release: v1.5.3 (12)"
+   git commit -m "release: v1.5.4 (13)"
    git push origin master
    ```
 4. CI `Build Android APK` berjalan otomatis: test → build web → build APK → verifikasi signature → upload artifact.
