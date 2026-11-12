@@ -126,7 +126,9 @@ https://kasir-seafood.vercel.app
 
 Install APK setelah deployment web berstatus `Ready`. Jika APK lama memakai signing key berbeda, uninstall APK lama terlebih dahulu.
 
-## 7. Tes Printer iMin
+## 7. Tes Printer
+
+### Printer iMin
 
 1. Install APK ke D4-504.
 2. Login ke kasir.
@@ -136,6 +138,16 @@ Install APK setelah deployment web berstatus `Ready`. Jika APK lama memakai sign
 6. Tekan `Cetak Struk Uji`.
 7. Buka **Setup Printer** dan pilih **Gunakan Printer Built-in (iMin)**.
 8. Cetak order asli.
+
+### Printer Comson 80mm USB/LAN
+
+1. Install APK terbaru ke perangkat Android cabang Pinang Ranti.
+2. Set env printer sebelum build (lihat `PANDUAN_PRINTER_COMSON.md`).
+3. Buka **Setup Printer**, lalu pilih **Printer LAN (Comson)** atau **Printer USB (Comson)**.
+4. Untuk LAN: isi IP printer dan port `9100`, atau tekan **Cari Printer**.
+5. Untuk USB: sambungkan kabel OTG, tekan **Muat Ulang**, lalu setujui izin USB.
+6. Pastikan status `connected`, buka `/printer-test`, dan tekan **Cetak Struk Uji**.
+7. Pastikan struk 80mm tercetak dan auto cutter memotong kertas.
 
 Untuk log navigasi dan printer:
 

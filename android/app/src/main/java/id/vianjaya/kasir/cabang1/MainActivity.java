@@ -55,6 +55,9 @@ public class MainActivity extends BridgeActivity {
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     private SppPrinter sppPrinter;
+    private LanPrinter lanPrinter;
+    private UsbPrinter usbPrinter;
+    private volatile String activeTransport = "spp";
     private volatile String connectionState = "idle";
     private volatile long connectionAttempt;
     private volatile Boolean bindResult;
@@ -75,6 +78,8 @@ public class MainActivity extends BridgeActivity {
         super.onCreate(savedInstanceState);
         sppPrinter = new SppPrinter(this);
         sppPrinter.refreshState();
+        lanPrinter = new LanPrinter(this);
+        usbPrinter = new UsbPrinter(this);
         WebView webView = getBridge().getWebView();
         webView.addJavascriptInterface(new IMinPrinterBridge(), "IMinPrinter");
         webView.setWebViewClient(new BridgeWebViewClient(getBridge()) {
@@ -97,16 +102,16 @@ public class MainActivity extends BridgeActivity {
     public void onResume() {
         super.onResume();
         // Cached state only: no socket, no SDK bind.
-        if (sppPrinter != null) {
-            sppPrinter.refreshState();
-            connectionState = sppPrinter.connectionState();
-        }
+        if (sppPrinter != null) sppPrinter.refreshState();
+        connectionState = transportState();
     }
 
     @Override
     public void onDestroy() {
         printExecutor.shutdownNow();
         if (sppPrinter != null) sppPrinter.shutdown();
+        if (lanPrinter != null) lanPrinter.shutdown();
+        if (usbPrinter != null) usbPrinter.shutdown();
         mainHandler.removeCallbacksAndMessages(null);
         super.onDestroy();
     }
@@ -150,6 +155,10 @@ public class MainActivity extends BridgeActivity {
             snapshot.put("connectResult", diagnosticStage);
             snapshot.put("bytesSent", bytesSent);
             snapshot.put("connectionState", connectionState);
+            snapshot.put("transport", activeTransport);
+            snapshot.put("lanHost", lanPrinter == null ? "" : lanPrinter.host());
+            snapshot.put("lanPort", lanPrinter == null ? LanPrinter.DEFAULT_PORT : lanPrinter.port());
+            snapshot.put("usbDevices", usbPrinter == null ? new JSONArray() : usbPrinter.listDevices());
             snapshot.put("lastConnectAt", sppPrinter == null ? 0L : sppPrinter.lastConnectAt());
             synchronized (diagnosticData) {
                 java.util.Iterator<String> keys = diagnosticData.keys();
@@ -250,6 +259,27 @@ public class MainActivity extends BridgeActivity {
         paperWidth = SppPrinter.normalizePaperWidth(requested);
     }
 
+    private String transportState() {
+        if ("lan".equals(activeTransport)) return lanPrinter == null ? "idle" : lanPrinter.connectionState();
+        if ("usb".equals(activeTransport)) return usbPrinter == null ? "idle" : usbPrinter.connectionState();
+        return sppPrinter == null ? connectionState : sppPrinter.connectionState();
+    }
+
+    private JSONObject transportFailure(String errorClass, String message) {
+        try {
+            JSONObject json = new JSONObject();
+            json.put("ok", false);
+            json.put("status", "failed");
+            json.put("error", message);
+            json.put("errorClass", errorClass);
+            json.put("userMessage", message);
+            json.put("attempts", 0);
+            return json;
+        } catch (Exception ignored) {
+            return new JSONObject();
+        }
+    }
+
     private final class IMinPrinterBridge {
         @JavascriptInterface public boolean isSupported() {
             return true;
@@ -259,6 +289,7 @@ public class MainActivity extends BridgeActivity {
             try {
                 if (USE_IMIN_SDK) return connectThroughSdk();
                 if (sppPrinter == null) return false;
+                activeTransport = "spp";
                 diagnosticStage = "spp-connect";
                 diagnosticErrorClass = "";
                 diagnosticErrorMessage = "";
@@ -281,10 +312,69 @@ public class MainActivity extends BridgeActivity {
             }
         }
 
+        @JavascriptInterface public String connectLan(String host, int port) {
+            try {
+                activeTransport = "lan";
+                diagnosticStage = "lan-connect";
+                JSONObject response = lanPrinter == null
+                        ? transportFailure("lan-unavailable", "Printer LAN tidak tersedia")
+                        : lanPrinter.connect(host, port);
+                absorbSpp(response);
+                connectionState = transportState();
+                recordDiagnostic("lanAt", clock());
+                recordDiagnostic("lanHost", host == null ? "" : host);
+                recordDiagnostic("lanPort", port);
+                return response.toString();
+            } catch (Throwable error) {
+                Log.e(TAG, "connect lan failed", error);
+                return bridgeError("lan-connect", error);
+            }
+        }
+
+        @JavascriptInterface public String scanLan(int port, int timeoutMs) {
+            try {
+                return LanScanner.scan(MainActivity.this, port, timeoutMs).toString();
+            } catch (Throwable error) {
+                Log.e(TAG, "scan lan failed", error);
+                return bridgeError("lan-scan", error);
+            }
+        }
+
+        @JavascriptInterface public String listUsbPrinters() {
+            try {
+                return usbPrinter == null ? new JSONArray().toString() : usbPrinter.listDevices().toString();
+            } catch (Throwable error) {
+                Log.e(TAG, "list usb failed", error);
+                return new JSONArray().toString();
+            }
+        }
+
+        @JavascriptInterface public String connectUsb(String deviceId) {
+            try {
+                activeTransport = "usb";
+                diagnosticStage = "usb-connect";
+                JSONObject response = usbPrinter == null
+                        ? transportFailure("usb-unavailable", "Printer USB tidak tersedia")
+                        : usbPrinter.connect(deviceId);
+                absorbSpp(response);
+                connectionState = transportState();
+                recordDiagnostic("usbAt", clock());
+                recordDiagnostic("usbDevice", deviceId == null ? "" : deviceId);
+                return response.toString();
+            } catch (Throwable error) {
+                Log.e(TAG, "connect usb failed", error);
+                return bridgeError("usb-connect", error);
+            }
+        }
+
+        @JavascriptInterface public void setPaperWidth(String requested) {
+            setSppPaperWidth(requested);
+        }
+
         @JavascriptInterface public String getDiagnostics() {
             try {
                 diagnosticStage = "status";
-                connectionState = sppPrinter == null ? connectionState : sppPrinter.connectionState();
+                connectionState = transportState();
                 return result(connectionState.equals("connected"), statusText(diagnosticStatusCode), null, 0);
             } catch (Throwable error) {
                 Log.e(TAG, "error stage=status", error);
@@ -294,6 +384,7 @@ public class MainActivity extends BridgeActivity {
 
         @JavascriptInterface public String tesCetakSpp(String requestedPaperWidth) {
             try {
+                activeTransport = "spp";
                 setSppPaperWidth(requestedPaperWidth);
                 diagnosticStage = "spp-test";
                 JSONObject spp = sppPrinter.printTest(paperWidth);
@@ -324,10 +415,10 @@ public class MainActivity extends BridgeActivity {
 
         @JavascriptInterface public void disconnect() {
             try {
-                if (sppPrinter != null) {
-                    sppPrinter.forgetConnection();
-                    connectionState = sppPrinter.connectionState();
-                }
+                if (sppPrinter != null) sppPrinter.forgetConnection();
+                if (lanPrinter != null) lanPrinter.disconnect();
+                if (usbPrinter != null) usbPrinter.disconnect();
+                connectionState = "idle";
                 recordDiagnostic("disconnectAt", clock());
             } catch (Throwable error) {
                 Log.e(TAG, "disconnect failed", error);
@@ -346,15 +437,15 @@ public class MainActivity extends BridgeActivity {
 
         @JavascriptInterface public String getStatus() {
             try {
-                connectionState = sppPrinter == null ? connectionState : sppPrinter.connectionState();
-                Log.d(TAG, "status state=" + connectionState);
+                connectionState = transportState();
+                Log.d(TAG, "status transport=" + activeTransport + " state=" + connectionState);
                 return connectionState;
             } catch (Throwable error) { Log.e(TAG, "status failed", error); bridgeError("status", error); return "error"; }
         }
     }
 
     private String printJobInternal(String jobId, String base64Data) {
-        setSppPaperWidth(null);
+        if ("spp".equals(activeTransport)) setSppPaperWidth(null);
         if (jobId == null || jobId.isEmpty()) jobId = UUID.randomUUID().toString();
         final String id = jobId;
         String previous = recentJobs.get(id);
@@ -383,6 +474,8 @@ public class MainActivity extends BridgeActivity {
             diagnosticErrorClass = "invalid-data";
             return result(false, "failed", "Data struk tidak valid", 0);
         }
+        if ("lan".equals(activeTransport)) return printThroughLan(jobId, data);
+        if ("usb".equals(activeTransport)) return printThroughUsb(jobId, data);
         int attempts = 0;
         pathUsed = PATH_SPP;
         if (USE_IMIN_SDK) {
@@ -417,6 +510,60 @@ public class MainActivity extends BridgeActivity {
             }
         }
         return result(false, "failed", diagnosticUserMessage.isEmpty() ? diagnosticErrorMessage : diagnosticUserMessage, attempts);
+    }
+
+    private String printThroughLan(String jobId, byte[] data) {
+        pathUsed = "lan";
+        diagnosticStage = "lan-print";
+        try {
+            JSONObject response = lanPrinter == null
+                    ? transportFailure("lan-unavailable", "Printer LAN tidak tersedia")
+                    : lanPrinter.print(data, paperWidth);
+            absorbSpp(response);
+            connectionState = transportState();
+            recordDiagnostic("path", pathUsed);
+            recordDiagnostic("lanAt", clock());
+            recordDiagnostic("paperWidth", paperWidth);
+            if (response.optBoolean("ok", false)) {
+                return result(true, "printed", null, response.optInt("attempts", 1));
+            }
+            String message = diagnosticUserMessage.isEmpty()
+                    ? response.optString("error", "Gagal mencetak ke printer LAN")
+                    : diagnosticUserMessage;
+            return result(false, "failed", message, response.optInt("attempts", 0));
+        } catch (Throwable error) {
+            Log.e(TAG, "job=" + jobId + " lan failed", error);
+            diagnosticErrorClass = "lan-print-failed";
+            diagnosticErrorMessage = error.getMessage() == null ? error.toString() : error.getMessage();
+            return result(false, "failed", diagnosticErrorMessage, 1);
+        }
+    }
+
+    private String printThroughUsb(String jobId, byte[] data) {
+        pathUsed = "usb";
+        diagnosticStage = "usb-print";
+        try {
+            JSONObject response = usbPrinter == null
+                    ? transportFailure("usb-unavailable", "Printer USB tidak tersedia")
+                    : usbPrinter.print(data, paperWidth);
+            absorbSpp(response);
+            connectionState = transportState();
+            recordDiagnostic("path", pathUsed);
+            recordDiagnostic("usbAt", clock());
+            recordDiagnostic("paperWidth", paperWidth);
+            if (response.optBoolean("ok", false)) {
+                return result(true, "printed", null, response.optInt("attempts", 1));
+            }
+            String message = diagnosticUserMessage.isEmpty()
+                    ? response.optString("error", "Gagal mencetak ke printer USB")
+                    : diagnosticUserMessage;
+            return result(false, "failed", message, response.optInt("attempts", 0));
+        } catch (Throwable error) {
+            Log.e(TAG, "job=" + jobId + " usb failed", error);
+            diagnosticErrorClass = "usb-print-failed";
+            diagnosticErrorMessage = error.getMessage() == null ? error.toString() : error.getMessage();
+            return result(false, "failed", diagnosticErrorMessage, 1);
+        }
     }
 
     private JSONObject failure(String errorClass, Throwable error) {

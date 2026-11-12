@@ -15,10 +15,22 @@ export function loadPrinterConfig(): PrinterConfig | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return null
-    return applyBuiltinPaperWidth(JSON.parse(raw) as PrinterConfig)
+    return applyBuiltinPaperWidth(normalizeConfig(JSON.parse(raw) as PrinterConfig))
   } catch {
     return null
   }
+}
+
+/** Keeps old configs usable and gives LAN printers their standard raw port. */
+function normalizeConfig(config: PrinterConfig): PrinterConfig {
+  if (config.connectionType === 'network') {
+    const port = typeof config.port === 'number' && config.port >= 1 && config.port <= 65535 ? config.port : 9100
+    return { ...config, port, host: (config.host ?? '').trim() }
+  }
+  if (config.connectionType === 'usb') {
+    return { ...config, usbDeviceId: config.usbDeviceId || config.deviceId }
+  }
+  return config
 }
 
 /**

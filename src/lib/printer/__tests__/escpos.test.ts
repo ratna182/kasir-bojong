@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { encodeRasterImage } from '../escpos'
+import { CUT_FEED_LINES, encodeRasterImage, feedAndCut } from '../escpos'
 
 describe('encodeRasterImage', () => {
   it('writes the GS v 0 header for a 48 dot wide, 96 dot tall bitmap', () => {
@@ -27,5 +27,14 @@ describe('encodeRasterImage', () => {
     const output = encodeRasterImage({ data: new Uint8Array(16), widthDots: 16, heightDots: 2 })
 
     expect(Array.from(output.slice(8))).toEqual([0, 0, 0, 0])
+  })
+})
+
+describe('feedAndCut', () => {
+  it('feeds four lines before the full cut used by the Comson auto cutter', () => {
+    const output = feedAndCut(CUT_FEED_LINES)
+
+    expect(Array.from(output.slice(0, CUT_FEED_LINES))).toEqual([0x0A, 0x0A, 0x0A, 0x0A])
+    expect(Array.from(output.slice(CUT_FEED_LINES))).toEqual([0x1D, 0x56, 0x00])
   })
 })

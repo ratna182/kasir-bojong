@@ -5,6 +5,7 @@ import { printer } from '@/lib/printer'
 import { iminPrinter } from '@/lib/printer/imin-sdk'
 import { loadPrinterConfig } from '@/lib/printer/storage'
 import { compose, drawLine, feedAndCut, initPrinter, setAlign, setBold, setText } from '@/lib/printer/escpos'
+import type { UsbPrinterInfo } from '@/lib/printer/types'
 
 export default function PrinterTestPage() {
   const [status, setStatus] = useState('idle')
@@ -13,8 +14,13 @@ export default function PrinterTestPage() {
   const [diagnostics, setDiagnostics] = useState<Record<string, unknown> | null>(null)
   const [diagnosticText, setDiagnosticText] = useState('')
   const [logs, setLogs] = useState<string[]>([])
+  const [lanHost, setLanHost] = useState('')
+  const [lanPort, setLanPort] = useState(9100)
+  const [scanning, setScanning] = useState(false)
+  const [scanResults, setScanResults] = useState<string[]>([])
+  const [usbPrinters, setUsbPrinters] = useState<UsbPrinterInfo[]>([])
 
-  const addLog = (message: string) => setLogs((current) => [`${new Date().toLocaleTimeString()} ${message}`, ...current].slice(0, 20))
+  const addLog = (message: string) => setLogs((current) => [`${new Date().toLocaleTimeString()} ${message}`, ...current].slice(0, 30))
 
   async function refreshNativeInfo() {
     const available = iminPrinter.isSupported()
@@ -44,35 +50,88 @@ export default function PrinterTestPage() {
   }
 
   useEffect(() => {
-    refreshNativeInfo()
-    const retry = window.setTimeout(refreshNativeInfo, 1000)
-    return () => window.clearTimeout(retry)
+    const initial = window.setTimeout(() => {
+      const saved = loadPrinterConfig()
+      if (saved?.host) setLanHost(saved.host)
+      if (saved?.port) setLanPort(saved.port)
+      void refreshNativeInfo()
+    }, 0)
+    const retry = window.setTimeout(() => { void refreshNativeInfo() }, 1000)
+    return () => {
+      window.clearTimeout(initial)
+      window.clearTimeout(retry)
+    }
   }, [])
 
-  async function connect() {
+  async function connectSpp() {
     const connected = await printer.connectImin()
     const nextStatus = await iminPrinter.getStatus()
     setStatus(nextStatus)
-    addLog(`connect ok=${connected} status=${nextStatus}`)
+    addLog(`SPP connect ok=${connected} status=${nextStatus}`)
     await refreshNativeInfo()
   }
 
+  async function scanLan() {
+    setScanning(true)
+    setScanResults([])
+    addLog(`memindai ${lanHost ? lanHost.split('.').slice(0, 3).join('.') : 'jaringan'}:${lanPort}...`)
+    const result = await printer.scanNetwork(lanPort)
+    setScanResults(result.hosts)
+    addLog(`scan ok=${result.ok} hosts=${JSON.stringify(result.hosts)} msg=${result.userMessage || result.error || ''}`)
+    if (result.hosts.length === 1) setLanHost(result.hosts[0])
+    setScanning(false)
+  }
+
+  async function connectLan() {
+    const connected = await printer.connectNetwork(lanHost, lanPort, loadPrinterConfig()?.width || '80mm')
+    const nextStatus = await iminPrinter.getStatus()
+    setStatus(nextStatus)
+    addLog(`LAN connect ${lanHost}:${lanPort} ok=${connected} status=${nextStatus} error=${printer.error}`)
+    await refreshNativeInfo()
+  }
+
+  async function refreshUsb() {
+    const devices = await printer.listUsbPrinters()
+    setUsbPrinters(devices)
+    addLog(`USB devices=${JSON.stringify(devices)}`)
+  }
+
+  async function connectUsb(device: UsbPrinterInfo) {
+    const connected = await printer.connectUsb(device.deviceId, device.name, loadPrinterConfig()?.width || '80mm')
+    const nextStatus = await iminPrinter.getStatus()
+    setStatus(nextStatus)
+    addLog(`USB connect ${device.name} ok=${connected} status=${nextStatus} error=${printer.error}`)
+    await refreshNativeInfo()
+    await refreshUsb()
+  }
+
   async function printTest() {
-    if (status !== 'connected') {
-      await refreshNativeInfo()
-      addLog('cetak dibatalkan: Connect belum sukses; lihat diagnostik di atas')
-      return
-    }
+    const width = loadPrinterConfig()?.width || '80mm'
+    const columns = width === '58mm' ? 32 : 48
     const jobId = `printer-test-${Date.now()}`
-    const data = compose(initPrinter(), setAlign('center'), setBold(true), setText('IMIN PRINTER TEST\n'), setBold(false), setAlign('left'), setText(`${drawLine(32)}\n`), setText('Kolom kiri                 Rp 10.000\n'), setText('Qty 2                      Rp 20.000\n'), setText(`${drawLine(32)}\nTOTAL                      Rp 30.000\n`), feedAndCut(3))
+    const data = compose(
+      initPrinter(),
+      setAlign('center'),
+      setBold(true),
+      setText('COMSON 80MM TEST\n'),
+      setBold(false),
+      setAlign('left'),
+      setText(`${drawLine(columns)}\n`),
+      setText(`Kertas ${width} / ${columns} kolom\n`),
+      setText('Kolom kiri                 Rp 10.000\n'),
+      setText('Qty 2                      Rp 20.000\n'),
+      setText(`${drawLine(columns)}\nTOTAL                      Rp 30.000\n`),
+      setText('TES CETAK OK\n'),
+      feedAndCut(4),
+    )
     const result = await printer.printReceipt(data, jobId)
-    const text = typeof result === 'boolean' ? `ok=${result}` : `job=${jobId} ${JSON.stringify(result)}`
-    setLogs((current) => [text, ...current].slice(0, 20))
+    const text = typeof result === 'boolean' ? `ok=${result} error=${printer.error}` : `job=${jobId} ${JSON.stringify(result)}`
+    addLog(text)
     await refreshNativeInfo()
   }
 
   async function testSpp() {
-    const width = loadPrinterConfig()?.width || '58mm'
+    const width = loadPrinterConfig()?.width || '80mm'
     const result = await iminPrinter.testSpp(width)
     addLog(`tes SPP ${width}: ${JSON.stringify(result)}`)
     await refreshNativeInfo()
@@ -90,8 +149,26 @@ export default function PrinterTestPage() {
     <p>Bridge: <strong>{bridgeAvailable ? 'tersedia' : 'tidak tersedia'}</strong></p>
     <p>Status: <strong>{status}</strong></p>
     {diagnostics && <pre aria-label="Diagnostik native" style={{ overflowWrap: 'anywhere', whiteSpace: 'pre-wrap' }}>{diagnosticText}</pre>}
-    <div style={{ display: 'flex', gap: 8 }}>
-      <button type="button" onClick={connect}>Connect</button>
+
+    <section style={{ border: '1px solid #ccc', borderRadius: 8, padding: 12, marginBottom: 12 }}>
+      <h2 style={{ fontSize: '1rem', marginTop: 0 }}>LAN (Comson)</h2>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <input value={lanHost} onChange={(event) => setLanHost(event.target.value)} placeholder="192.168.1.50" style={{ flex: 2, minWidth: 160, padding: 8 }} />
+        <input value={lanPort} onChange={(event) => setLanPort(Number(event.target.value) || 0)} inputMode="numeric" aria-label="Port LAN" style={{ flex: 1, minWidth: 80, padding: 8 }} />
+        <button type="button" onClick={scanLan} disabled={scanning}>{scanning ? 'Memindai...' : 'Scan LAN'}</button>
+        <button type="button" onClick={connectLan}>Connect LAN</button>
+      </div>
+      {scanResults.length > 0 && <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>{scanResults.map((host) => <button key={host} type="button" onClick={() => setLanHost(host)}>{host}</button>)}</div>}
+    </section>
+
+    <section style={{ border: '1px solid #ccc', borderRadius: 8, padding: 12, marginBottom: 12 }}>
+      <h2 style={{ fontSize: '1rem', marginTop: 0 }}>USB (Comson)</h2>
+      <button type="button" onClick={refreshUsb}>Muat Ulang USB</button>
+      {usbPrinters.length === 0 ? <p>Belum ada perangkat USB terdeteksi.</p> : <ul>{usbPrinters.map((device) => <li key={device.deviceId}><button type="button" onClick={() => connectUsb(device)} disabled={!device.printable}>{device.name} - printable={String(device.printable)} izin={String(device.hasPermission)}</button></li>)}</ul>}
+    </section>
+
+    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      <button type="button" onClick={connectSpp}>Connect SPP</button>
       <button type="button" onClick={printTest}>Cetak Struk Uji</button>
       <button type="button" onClick={testSpp}>Tes Cetak SPP</button>
       <button type="button" onClick={copyLogs}>Salin</button>

@@ -1,4 +1,11 @@
-import type { PrinterConfig, PrinterStatus, IMinPrinterSDK, IMinPrintJobResult } from './types'
+import type {
+  PrinterStatus,
+  IMinPrinterSDK,
+  IMinPrintJobResult,
+  LanScanResult,
+  UsbPrinterInfo,
+  PrinterConnectResult,
+} from './types'
 
 type StatusListener = (status: PrinterStatus) => void
 
@@ -39,6 +46,11 @@ declare global {
       getDiagnostics?: () => Promise<string> | string
       getAppVersion?: () => Promise<string> | string
       tesCetakSpp?: (paperWidth?: string) => Promise<string> | string
+      connectLan?: (host: string, port: number) => string
+      scanLan?: (port: number, timeoutMs: number) => string
+      listUsbPrinters?: () => string
+      connectUsb?: (deviceId: string) => string
+      setPaperWidth?: (width: string) => void
       isSupported: () => boolean
     }
   }
@@ -113,8 +125,8 @@ class IMinPrinter implements IMinPrinterSDK {
       this.lastError = ''
       this.log('Connecting to iMin built-in printer...')
 
-      const initResult = await window.IMinPrinter!.connect()
-      
+      await window.IMinPrinter!.connect()
+
       const startTime = Date.now()
       while (Date.now() - startTime < timeoutMs) {
         await new Promise(r => setTimeout(r, 500))
@@ -234,6 +246,78 @@ class IMinPrinter implements IMinPrinterSDK {
     } catch (error) {
       this.logError('App version failed', error)
       return null
+    }
+  }
+
+  async connectNetwork(host: string, port: number): Promise<PrinterConnectResult> {
+    const bridge = typeof window === 'undefined' ? undefined : window.IMinPrinter
+    if (!bridge?.connectLan) {
+      return { ok: false, error: 'Bridge printer native tidak tersedia', errorClass: 'bridge-missing' }
+    }
+    try {
+      const result = this.parseJson<PrinterConnectResult>(bridge.connectLan(host, port), { ok: false })
+      if (!result.ok) this.lastError = result.userMessage || result.error || 'Gagal menghubungkan printer LAN'
+      return result
+    } catch (error) {
+      this.logError('LAN connect failed', error)
+      return { ok: false, error: 'Bridge printer LAN gagal', errorClass: 'bridge-error' }
+    }
+  }
+
+  async scanNetwork(port: number = 9100, timeoutMs: number = 8000): Promise<LanScanResult> {
+    const bridge = typeof window === 'undefined' ? undefined : window.IMinPrinter
+    if (!bridge?.scanLan) {
+      return { ok: false, hosts: [], errorClass: 'bridge-missing', error: 'Bridge printer native tidak tersedia' }
+    }
+    try {
+      return this.parseJson<LanScanResult>(bridge.scanLan(port, timeoutMs), { ok: false, hosts: [] })
+    } catch (error) {
+      this.logError('LAN scan failed', error)
+      return { ok: false, hosts: [], errorClass: 'bridge-error', error: 'Pemindaian jaringan gagal' }
+    }
+  }
+
+  async listUsbPrinters(): Promise<UsbPrinterInfo[]> {
+    const bridge = typeof window === 'undefined' ? undefined : window.IMinPrinter
+    if (!bridge?.listUsbPrinters) return []
+    try {
+      const parsed = this.parseJson<UsbPrinterInfo[]>(bridge.listUsbPrinters(), [])
+      return Array.isArray(parsed) ? parsed : []
+    } catch (error) {
+      this.logError('USB list failed', error)
+      return []
+    }
+  }
+
+  async connectUsb(deviceId: string): Promise<PrinterConnectResult> {
+    const bridge = typeof window === 'undefined' ? undefined : window.IMinPrinter
+    if (!bridge?.connectUsb) {
+      return { ok: false, error: 'Bridge printer native tidak tersedia', errorClass: 'bridge-missing' }
+    }
+    try {
+      const result = this.parseJson<PrinterConnectResult>(bridge.connectUsb(deviceId), { ok: false })
+      if (!result.ok) this.lastError = result.userMessage || result.error || 'Gagal menghubungkan printer USB'
+      return result
+    } catch (error) {
+      this.logError('USB connect failed', error)
+      return { ok: false, error: 'Bridge printer USB gagal', errorClass: 'bridge-error' }
+    }
+  }
+
+  setPaperWidth(width: '58mm' | '80mm'): void {
+    try {
+      window.IMinPrinter?.setPaperWidth?.(width)
+    } catch (error) {
+      this.logError('Set paper width failed', error)
+    }
+  }
+
+  private parseJson<T>(raw: string | null | undefined, fallback: T): T {
+    if (!raw) return fallback
+    try {
+      return JSON.parse(raw) as T
+    } catch {
+      return fallback
     }
   }
 

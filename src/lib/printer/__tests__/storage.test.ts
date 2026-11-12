@@ -40,6 +40,30 @@ describe('printer config storage', () => {
     expect(loadPrinterConfig()?.width).toBe('58mm')
   })
 
+  it('adds the raw ESC/POS port to a LAN config without one', () => {
+    savePrinterConfig({
+      deviceId: 'lan:192.168.1.50',
+      deviceName: 'Printer LAN 192.168.1.50',
+      width: '80mm',
+      connectionType: 'network',
+      host: ' 192.168.1.50 ',
+    })
+    expect(loadPrinterConfig()).toMatchObject({ host: '192.168.1.50', port: 9100 })
+  })
+
+  it('keeps a USB device id for reconnect', () => {
+    savePrinterConfig({
+      deviceId: '/dev/bus/usb/001/002',
+      deviceName: 'Comson 80mm',
+      width: '80mm',
+      connectionType: 'usb',
+    })
+    expect(loadPrinterConfig()).toMatchObject({
+      connectionType: 'usb',
+      usbDeviceId: '/dev/bus/usb/001/002',
+    })
+  })
+
   it('drops everything on clear', () => {
     savePrinterConfig(BUILT_IN)
     clearPrinterConfig()

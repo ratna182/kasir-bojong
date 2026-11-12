@@ -1,10 +1,44 @@
-export type PrinterConnectionType = 'bluetooth' | 'imin'
+export type PrinterConnectionType = 'bluetooth' | 'imin' | 'network' | 'usb'
 
 export interface PrinterConfig {
   deviceId: string
   deviceName: string
   width: '58mm' | '80mm'
   connectionType: PrinterConnectionType
+  host?: string
+  port?: number
+  usbDeviceId?: string
+}
+
+export interface LanScanResult {
+  ok: boolean
+  localIp?: string
+  subnet?: string
+  port?: number
+  hosts: string[]
+  scanned?: number
+  elapsedMs?: number
+  errorClass?: string
+  error?: string
+  userMessage?: string | null
+}
+
+export interface UsbPrinterInfo {
+  deviceId: string
+  name: string
+  vendorId: number
+  productId: number
+  hasPermission: boolean
+  printable: boolean
+}
+
+export interface PrinterConnectResult {
+  ok: boolean
+  status?: string
+  error?: string | null
+  errorClass?: string
+  userMessage?: string | null
+  attempts?: number
 }
 
 export type PrinterStatus = 'idle' | 'connecting' | 'connected' | 'error' | 'unsupported'

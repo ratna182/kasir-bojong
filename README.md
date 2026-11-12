@@ -23,8 +23,9 @@ Aplikasi POS (Point of Sales) multi-outlet untuk 3 cabang warung makan **Seafood
 
 4. **Cetak Struk Thermal 80mm**
    - Format struk thermal standar lebar 80mm.
-   - Tombol "Cetak Struk" langsung memicu dialog cetak browser (`window.print()`).
-   - CSS `@media print` rapi untuk printer kasir thermal USB/Bluetooth.
+   - Dukungan printer Bluetooth, printer built-in iMin, serta printer **Comson USB & LAN** dengan auto cutter melalui APK Android.
+   - Tombol "Cetak Struk" memakai bridge native APK; browser tetap memakai dialog cetak (`window.print()`).
+   - CSS `@media print` rapi untuk printer kasir thermal.
 
 5. **Riwayat Transaksi**
    - Daftar transaksi hari ini dan filter tanggal sebelumnya.
@@ -74,8 +75,20 @@ Buka browser di [http://localhost:3000](http://localhost:3000).
 
 ## Android APK per Cabang
 
-APK menggunakan server Next.js yang sudah di-deploy dan tetap memakai bridge printer iMin.
+APK menggunakan server Next.js yang sudah di-deploy dan tetap memakai bridge printer native.
 Setiap cabang dapat dibuat sebagai APK terpisah dengan `CAPACITOR_SERVER_URL`, `CAPACITOR_APP_ID`, dan `CAPACITOR_APP_NAME` masing-masing.
+
+Untuk cabang dengan printer Comson 80mm USB/LAN, set juga:
+
+```powershell
+$env:NEXT_PUBLIC_PRINTER_TYPE="network"
+$env:NEXT_PUBLIC_PRINTER_HOST="192.168.1.50"
+$env:NEXT_PUBLIC_PRINTER_PORT="9100"
+$env:NEXT_PUBLIC_PRINTER_WIDTH="80mm"
+$env:NEXT_PUBLIC_PRINTER_ALLOWED="network,usb"
+```
+
+Panduan lengkap: `PANDUAN_PRINTER_COMSON.md`.
 
 ```bash
 npm install

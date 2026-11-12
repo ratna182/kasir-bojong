@@ -40,3 +40,12 @@ npx cap sync android
 - `npm run lint` is not green from the existing repository baseline: existing API `any` errors and React effect errors remain; no new TypeScript error was introduced.
 
 No physical D4-504 device is available in this environment. Therefore successful APK compilation is not proof that paper was printed. The expected APK is `android/app/build/outputs/apk/debug/app-debug.apk`; install over the old app only if the signing key matches, otherwise uninstall the old APK first.
+
+## Comson 80mm USB & LAN (v1.5.2 / version code 11)
+
+- Menambahkan transport native `LanPrinter`, `LanScanner`, dan `UsbPrinter` serta routing baru di `MainActivity` untuk `network` dan `usb`.
+- `PrinterSetup` dan `/printer-test` sekarang mendukung scan LAN port 9100, input IP manual, daftar perangkat USB OTG, izin USB, dan cetak uji 80mm dengan auto cutter.
+- Default cabang diatur lewat `NEXT_PUBLIC_PRINTER_TYPE`, `NEXT_PUBLIC_PRINTER_HOST`, `NEXT_PUBLIC_PRINTER_PORT`, `NEXT_PUBLIC_PRINTER_WIDTH`, dan `NEXT_PUBLIC_PRINTER_ALLOWED`.
+- Panduan operasional ada di `PANDUAN_PRINTER_COMSON.md`.
+- Verifikasi: `vitest run` 247 lulus, `tsc --noEmit` bersih, ESLint file yang diubah bersih, dan `:app:compileDebugJavaWithJavac` berhasil.
+- Cetak fisik, perilaku auto cutter, dan koneksi LAN/USB tetap harus diuji pada perangkat dan printer Comson asli.
