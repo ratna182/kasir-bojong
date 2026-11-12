@@ -36,11 +36,11 @@ Prosedur rilis APK Pinang Ranti, termasuk signing di CI dan backup keystore.
 4. CI `Build Android APK` berjalan otomatis: test → build web → build APK → verifikasi signature → upload artifact.
 5. Unduh artifact:
    ```powershell
-   gh run download --repo ratna182/kasir-bojong -n app-release-apk
+   gh run download --repo ratna182/kasir-bojong -n pinang-ranti-apk
    ```
 6. Verifikasi:
    ```powershell
-   $apk = "app-release.apk"
+   $apk = "pinang-ranti.apk"
    "$env:ANDROID_HOME\build-tools\36.0.0\apksigner.bat" verify --print-certs $apk
    "$env:ANDROID_HOME\build-tools\36.0.0\aapt.exe" dump badging $apk
    ```
@@ -90,5 +90,5 @@ Simpan minimal di dua tempat (mis. password manager + flashdisk offline). Jika k
 
 ## Catatan
 
-- Workflow juga membangun APK debug (`app-debug-apk`) untuk pengujian cepat.
+- Workflow juga membangun APK debug (`pinang-ranti-debug-apk`) untuk pengujian cepat.
 - APK release hanya ditandatangani jika keempat secret di atas tersedia; step "Verify release APK is signed" akan menggagalkan CI jika tidak.

@@ -17,7 +17,7 @@ Catatan: aplikasi ini adalah build kasir untuk outlet Pinang Ranti.
 ## Prasyarat
 
 - Mesin iMin dalam kondisi menyala dan terhubung internet.
-- File `app-release.apk` (dari CI artifact atau build lokal).
+- File `pinang-ranti.apk` (dari CI artifact atau build lokal).
 - Kabel USB + adb (opsional, untuk install lewat komputer).
 
 ## Cara Install
@@ -25,10 +25,10 @@ Catatan: aplikasi ini adalah build kasir untuk outlet Pinang Ranti.
 Lewat adb:
 
 ```powershell
-adb install -r app-release.apk
+adb install -r pinang-ranti.apk
 ```
 
-Atau salin `app-release.apk` ke mesin, lalu buka file-nya dan izinkan "Install unknown apps".
+Atau salin `pinang-ranti.apk` ke mesin, lalu buka file-nya dan izinkan "Install unknown apps".
 
 Jika muncul "App not installed": uninstall versi lama dengan package yang sama lebih dulu (`adb uninstall id.kasirbojongkulur.kasir`).
 

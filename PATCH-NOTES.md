@@ -39,7 +39,7 @@ npx cap sync android
 - Full `npx vitest run` is not green from the existing repository baseline: two unrelated date-sensitive laporan assertions fail and four `.agents` skill files are incorrectly collected as Vitest files. Those files were not changed.
 - `npm run lint` is not green from the existing repository baseline: existing API `any` errors and React effect errors remain; no new TypeScript error was introduced.
 
-No physical D4-504 device is available in this environment. Therefore successful APK compilation is not proof that paper was printed. The expected APK is `android/app/build/outputs/apk/debug/app-debug.apk`; install over the old app only if the signing key matches, otherwise uninstall the old APK first.
+No physical D4-504 device is available in this environment. Therefore successful APK compilation is not proof that paper was printed. The expected APK is `android/app/build/outputs/apk/debug/pinang-ranti-debug.apk`; install over the old app only if the signing key matches, otherwise uninstall the old APK first.
 
 ## Comson 80mm USB & LAN (v1.5.2 / version code 11)
 

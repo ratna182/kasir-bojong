@@ -115,7 +115,7 @@ Sebelum login, `/printer-test` boleh diarahkan ke `/login`. Setelah login, halam
 APK yang sudah dibangun berada di:
 
 ```text
-android/app/build/outputs/apk/debug/app-debug.apk
+android/app/build/outputs/apk/debug/pinang-ranti-debug.apk
 ```
 
 APK menggunakan server:

@@ -61,7 +61,7 @@ npx cap sync android
 
 # 6. Build APK debug
 cd android && ./gradlew assembleDebug
-# APK ada di: android/app/build/outputs/apk/debug/app-debug.apk
+# APK ada di: android/app/build/outputs/apk/debug/pinang-ranti-debug.apk
 ```
 
 ---
@@ -70,11 +70,11 @@ cd android && ./gradlew assembleDebug
 
 **Via ADB (device terkoneksi USB):**
 ```bash
-adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+adb install -r android/app/build/outputs/apk/debug/pinang-ranti-debug.apk
 ```
 
 **Atau transfer manual:**
-- Copy `app-debug.apk` ke HP
+- Copy `pinang-ranti-debug.apk` ke HP
 - Buka di File Manager → Install
 - Izinkan "Install unknown apps" di Settings
 

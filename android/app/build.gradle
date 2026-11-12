@@ -53,6 +53,13 @@ android {
             if (keystorePropertiesFile.exists()) signingConfig signingConfigs.release
         }
     }
+    applicationVariants.all { variant ->
+        variant.outputs.all { output ->
+            output.outputFileName = variant.buildType.name == 'release'
+                ? 'pinang-ranti.apk'
+                : "pinang-ranti-${variant.buildType.name}.apk"
+        }
+    }
 }
 
 repositories {
