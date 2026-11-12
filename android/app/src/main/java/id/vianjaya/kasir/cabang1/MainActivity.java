@@ -42,6 +42,8 @@ public class MainActivity extends BridgeActivity {
     private static final String SERVICE_ACTION = "com.imin.printerservice.NeoPrinterService";
     private static final String CONNECT_TYPE = "sdk-default/unknown";
     private static final String PATH_SPP = "spp";
+    private static final String PREFS = "printer_diagnostics";
+    private static final String KEY_TRANSPORT = "active_transport";
     private static final long CONNECT_TIMEOUT_MS = 5000L;
     private static final int MAX_PRINT_ATTEMPTS = 3;
     private static final long RETRY_GAP_MS = 250L;
@@ -80,6 +82,12 @@ public class MainActivity extends BridgeActivity {
         sppPrinter.refreshState();
         lanPrinter = new LanPrinter(this);
         usbPrinter = new UsbPrinter(this);
+        String savedTransport = getSharedPreferences(PREFS, MODE_PRIVATE).getString(KEY_TRANSPORT, "");
+        if (!savedTransport.isEmpty()) {
+            activeTransport = savedTransport;
+        } else if (usbPrinter != null && !usbPrinter.connectedDeviceId().isEmpty()) {
+            activeTransport = "usb";
+        }
         WebView webView = getBridge().getWebView();
         webView.addJavascriptInterface(new IMinPrinterBridge(), "IMinPrinter");
         webView.setWebViewClient(new BridgeWebViewClient(getBridge()) {
@@ -290,6 +298,7 @@ public class MainActivity extends BridgeActivity {
                 if (USE_IMIN_SDK) return connectThroughSdk();
                 if (sppPrinter == null) return false;
                 activeTransport = "spp";
+                getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(KEY_TRANSPORT, "spp").apply();
                 diagnosticStage = "spp-connect";
                 diagnosticErrorClass = "";
                 diagnosticErrorMessage = "";
@@ -315,6 +324,7 @@ public class MainActivity extends BridgeActivity {
         @JavascriptInterface public String connectLan(String host, int port) {
             try {
                 activeTransport = "lan";
+                getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(KEY_TRANSPORT, "lan").apply();
                 diagnosticStage = "lan-connect";
                 JSONObject response = lanPrinter == null
                         ? transportFailure("lan-unavailable", "Printer LAN tidak tersedia")
@@ -352,6 +362,7 @@ public class MainActivity extends BridgeActivity {
         @JavascriptInterface public String connectUsb(String deviceId) {
             try {
                 activeTransport = "usb";
+                getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(KEY_TRANSPORT, "usb").apply();
                 diagnosticStage = "usb-connect";
                 JSONObject response = usbPrinter == null
                         ? transportFailure("usb-unavailable", "Printer USB tidak tersedia")
@@ -419,6 +430,7 @@ public class MainActivity extends BridgeActivity {
                 if (lanPrinter != null) lanPrinter.disconnect();
                 if (usbPrinter != null) usbPrinter.disconnect();
                 connectionState = "idle";
+                getSharedPreferences(PREFS, MODE_PRIVATE).edit().remove(KEY_TRANSPORT).apply();
                 recordDiagnostic("disconnectAt", clock());
             } catch (Throwable error) {
                 Log.e(TAG, "disconnect failed", error);

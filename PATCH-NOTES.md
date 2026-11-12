@@ -48,4 +48,11 @@ No physical D4-504 device is available in this environment. Therefore successful
 - Default cabang diatur lewat `NEXT_PUBLIC_PRINTER_TYPE`, `NEXT_PUBLIC_PRINTER_HOST`, `NEXT_PUBLIC_PRINTER_PORT`, `NEXT_PUBLIC_PRINTER_WIDTH`, dan `NEXT_PUBLIC_PRINTER_ALLOWED`.
 - Panduan operasional ada di `PANDUAN_PRINTER_COMSON.md`.
 - Verifikasi: `vitest run` 247 lulus, `tsc --noEmit` bersih, ESLint file yang diubah bersih, dan `:app:compileDebugJavaWithJavac` berhasil.
+
+## Comson 80mm USB Fix (v1.5.5 / version code 14)
+
+- Memperbaiki sinkronisasi status `connected` pada `imin-sdk.ts` saat `connectUsb` dan `connectNetwork` berhasil, sehingga `printJob` tidak lagi terblokir oleh flag internal.
+- Memperbaiki `UnifiedPrinter.printReceipt` agar meneruskan `jobId` langsung ke transport USB/LAN.
+- Menambahkan persistensi `active_transport` ke SharedPreferences di `MainActivity.java` agar perangkat mengingat mode USB setelah restart aplikasi.
+- Memperbaiki pencocokan endpoint USB di `UsbPrinter.java` menggunakan perbandingan `getAddress()`.
 - Cetak fisik, perilaku auto cutter, dan koneksi LAN/USB tetap harus diuji pada perangkat dan printer Comson asli.

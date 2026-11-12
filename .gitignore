@@ -44,6 +44,7 @@ next-env.d.ts
 /android/keystore.properties
 /android/*.jks
 /android/*.keystore
+*.apk
 
 .vercel
 .env*

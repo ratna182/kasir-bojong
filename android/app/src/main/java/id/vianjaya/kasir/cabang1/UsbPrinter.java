@@ -294,10 +294,12 @@ public final class UsbPrinter {
     }
 
     private UsbInterface findInterface(UsbDevice device, UsbEndpoint endpoint) {
+        if (device == null || endpoint == null) return null;
         for (int index = 0; index < device.getInterfaceCount(); index++) {
             UsbInterface usbInterface = device.getInterface(index);
             for (int endpointIndex = 0; endpointIndex < usbInterface.getEndpointCount(); endpointIndex++) {
-                if (usbInterface.getEndpoint(endpointIndex) == endpoint) return usbInterface;
+                UsbEndpoint ep = usbInterface.getEndpoint(endpointIndex);
+                if (ep != null && ep.getAddress() == endpoint.getAddress()) return usbInterface;
             }
         }
         return device.getInterface(0);

@@ -311,13 +311,15 @@ class UnifiedPrinter {
   }
 
   async printReceipt(data: Uint8Array, jobId: string): Promise<IMinPrintJobResult | boolean> {
-    if (this.activePrinter !== 'imin') {
+    if (!this.activePrinter) {
       const saved = loadPrinterConfig()
-      if (saved?.connectionType === 'imin' && !(await this.connectImin())) {
-        return { ok: false, status: 'failed', error: 'Printer iMin belum terhubung', attempts: 0 }
+      if (saved) {
+        await this.connect(saved)
       }
     }
-    if (this.activePrinter === 'imin') return iminPrinter.printJob(jobId, data)
+    if (this.activePrinter === 'imin' || this.activePrinter === 'network' || this.activePrinter === 'usb') {
+      return iminPrinter.printJob(jobId, data)
+    }
     return this.print(data)
   }
 

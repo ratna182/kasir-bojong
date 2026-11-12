@@ -154,21 +154,25 @@ class IMinPrinter implements IMinPrinterSDK {
 
   async disconnect(): Promise<void> {
     try {
-      if (this.connected) {
+      if (this.connected || this.isSupported()) {
         await window.IMinPrinter?.disconnect()
-        this.connected = false
-        this.setStatus('idle')
-        this.log('Disconnected from iMin printer')
       }
     } catch (e) {
       this.logError('Disconnect failed', e)
+    } finally {
+      this.connected = false
+      this.setStatus('idle')
+      this.log('Disconnected from printer')
     }
   }
 
   async print(data: Uint8Array): Promise<boolean> {
     if (!this.connected) {
-      this.logError('Printer not connected')
-      return false
+      const currentStatus = await this.getStatus()
+      if (currentStatus !== 'connected') {
+        this.logError('Printer not connected')
+        return false
+      }
     }
 
     try {
@@ -190,7 +194,10 @@ class IMinPrinter implements IMinPrinterSDK {
 
   async printJob(jobId: string, data: Uint8Array): Promise<IMinPrintJobResult> {
     if (!this.connected) {
-      return { ok: false, status: 'failed', error: 'Printer iMin belum terhubung', attempts: 0 }
+      const currentStatus = await this.getStatus()
+      if (currentStatus !== 'connected') {
+        return { ok: false, status: 'failed', error: 'Printer belum terhubung', attempts: 0 }
+      }
     }
 
     try {
@@ -203,7 +210,7 @@ class IMinPrinter implements IMinPrinterSDK {
       if (!bridge) return { ok: false, status: 'failed', error: 'Bridge IMinPrinter tidak tersedia di APK', attempts: 0 }
       if (!bridge?.printJob) {
         const ok = await bridge?.print(base64)
-        return { ok: !!ok, status: ok ? 'printed' : 'failed', error: ok ? null : 'Printer iMin gagal mencetak', attempts: 1 }
+        return { ok: !!ok, status: ok ? 'printed' : 'failed', error: ok ? null : 'Printer gagal mencetak', attempts: 1 }
       }
       const raw = await bridge.printJob(jobId, base64)
       const result = JSON.parse(raw) as IMinPrintJobResult
@@ -211,7 +218,7 @@ class IMinPrinter implements IMinPrinterSDK {
       return result
     } catch (e) {
       this.logError('Print error', e)
-      return { ok: false, status: 'failed', error: 'Bridge iMin tidak dapat memproses job', attempts: 0 }
+      return { ok: false, status: 'failed', error: 'Bridge tidak dapat memproses job', attempts: 0 }
     }
   }
 
@@ -223,6 +230,7 @@ class IMinPrinter implements IMinPrinterSDK {
       const mappedStatus: PrinterStatus = status === 'connected' ? 'connected' : 
                                           status === 'error' ? 'error' : 'idle'
       this.setStatus(mappedStatus)
+      this.connected = (mappedStatus === 'connected')
       return mappedStatus
     } catch {
       return 'error'
@@ -256,7 +264,13 @@ class IMinPrinter implements IMinPrinterSDK {
     }
     try {
       const result = this.parseJson<PrinterConnectResult>(bridge.connectLan(host, port), { ok: false })
-      if (!result.ok) this.lastError = result.userMessage || result.error || 'Gagal menghubungkan printer LAN'
+      if (!result.ok) {
+        this.lastError = result.userMessage || result.error || 'Gagal menghubungkan printer LAN'
+      } else {
+        this.connected = true
+        this.setStatus('connected')
+        this.lastError = ''
+      }
       return result
     } catch (error) {
       this.logError('LAN connect failed', error)
@@ -296,7 +310,13 @@ class IMinPrinter implements IMinPrinterSDK {
     }
     try {
       const result = this.parseJson<PrinterConnectResult>(bridge.connectUsb(deviceId), { ok: false })
-      if (!result.ok) this.lastError = result.userMessage || result.error || 'Gagal menghubungkan printer USB'
+      if (!result.ok) {
+        this.lastError = result.userMessage || result.error || 'Gagal menghubungkan printer USB'
+      } else {
+        this.connected = true
+        this.setStatus('connected')
+        this.lastError = ''
+      }
       return result
     } catch (error) {
       this.logError('USB connect failed', error)
