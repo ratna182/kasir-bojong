@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { encodeReceipt } from '../receipt-encoder'
 import { buildReceiptLines, createReceiptData } from '../receipt-content'
-import { encodeRasterImage } from '../escpos'
+import { encodeRasterImage, CUT_FEED_LINES } from '../escpos'
 import { BRAND_NAME, CONTACT_WA } from '@/lib/branch-config'
 
 const logo = vi.hoisted(() => ({ load: vi.fn(async (): Promise<Uint8Array | null> => null) }))
@@ -10,7 +10,7 @@ vi.mock('../logo', () => ({
   clearReceiptLogoCache: () => {},
 }))
 
-const CUT_TAIL = [0x1B, 0x33, 20, 0x0A, 0x0A, 0x0A, 0x0A, 0x1D, 0x56, 0x00]
+const CUT_TAIL = [0x1B, 0x33, 20, 0x0A, 0x0A, 0x0A, 0x0A, 0x0A, 0x0A, 0x1D, 0x56, 0x00]
 
 const TRANSACTION = {
   id: 'tx-1',
@@ -73,7 +73,7 @@ describe('encodeReceipt', () => {
       width: '80mm',
     })
 
-    expect(Array.from(output.slice(-10))).toEqual(CUT_TAIL)
+    expect(Array.from(output.slice(-CUT_TAIL.length))).toEqual(CUT_TAIL)
   })
 
   it('starts with init, keeps item lines within paper width, and emits ASCII text', async () => {
@@ -87,7 +87,7 @@ describe('encodeReceipt', () => {
       width: '58mm',
     })
     expect(Array.from(output.slice(0, 2))).toEqual([0x1B, 0x40])
-    expect(Array.from(output.slice(-10))).toEqual(CUT_TAIL)
+    expect(Array.from(output.slice(-CUT_TAIL.length))).toEqual(CUT_TAIL)
     expect(new TextDecoder().decode(output)).not.toContain('\u2728')
     expect(widestLine(output)).toBeLessThanOrEqual(32)
   })
@@ -228,10 +228,10 @@ describe('encodeReceipt', () => {
 
   it('feeds the paper before cutting so the footer cannot stay behind the cutter', async () => {
     const output = await encodeReceipt({ transaction: TRANSACTION, cashier: 'Kasir', warungNama: null, width: '80mm' })
-    const feedBeforeCut = Array.from(output.slice(-7))
+    const feedBeforeCut = Array.from(output.slice(-(CUT_FEED_LINES + 3)))
 
-    expect(feedBeforeCut.slice(0, 4)).toEqual([0x0A, 0x0A, 0x0A, 0x0A])
-    expect(feedBeforeCut.slice(4)).toEqual([0x1D, 0x56, 0x00])
+    expect(feedBeforeCut.slice(0, CUT_FEED_LINES)).toEqual(Array(CUT_FEED_LINES).fill(0x0A))
+    expect(feedBeforeCut.slice(CUT_FEED_LINES)).toEqual([0x1D, 0x56, 0x00])
   })
 
   it('never asks the printer to align text, only the logo raster', async () => {
@@ -313,7 +313,7 @@ describe('encodeReceipt', () => {
 
     expect(rasterAt).toBeGreaterThan(-1)
     expect(headerAt).toBeGreaterThan(rasterAt)
-    expect(Array.from(output.slice(-10))).toEqual(CUT_TAIL)
+    expect(Array.from(output.slice(-CUT_TAIL.length))).toEqual(CUT_TAIL)
     expect(widestLine(output)).toBeLessThanOrEqual(48)
   })
 
@@ -321,7 +321,7 @@ describe('encodeReceipt', () => {
     logo.load.mockResolvedValue(null)
     const output = await encodeReceipt({ transaction: TRANSACTION, cashier: 'Kasir', warungNama: null, width: '80mm' })
     expect(output.length).toBeGreaterThan(100)
-    expect(Array.from(output.slice(-10))).toEqual(CUT_TAIL)
+    expect(Array.from(output.slice(-CUT_TAIL.length))).toEqual(CUT_TAIL)
   })
 })
 

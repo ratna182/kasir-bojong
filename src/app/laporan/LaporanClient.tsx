@@ -7,7 +7,7 @@ import PrinterStatusBadge from '@/components/PrinterStatus'
 import { printer } from '@/lib/printer'
 import { loadPrinterConfig } from '@/lib/printer/storage'
 import { encodeLaporan } from '@/lib/printer/laporan-encoder'
-import { BRAND_NAME, SOCIAL_LINES, formatBranchLine } from '@/lib/branch-config'
+import { BRAND_NAME, SOCIAL_LINES, formatBranchLine, stripPusat } from '@/lib/branch-config'
 import { formatWibDateTime, formatWibShiftRange, formatWibTime } from '@/lib/time'
 import { resolveLaporanSummary } from '@/lib/laporan-summary'
 import { isKategoriMinuman } from '@/lib/kategori'
@@ -661,7 +661,7 @@ export default function LaporanClient({ warungId, warungNama, warungs, role, ini
           <div className="print-divider" />
           <div className="print-footer">
             <p>*** REKAPITULASI RESMI ***</p>
-            <p>{currentWarungNama}</p>
+            <p>{stripPusat(currentWarungNama)}</p>
           </div>
         </div>
       )}

@@ -7,7 +7,7 @@ import PrinterStatusBadge from '@/components/PrinterStatus'
 import { printer } from '@/lib/printer'
 import { loadPrinterConfig } from '@/lib/printer/storage'
 import { encodeLaporan, type LaporanData } from '@/lib/printer/laporan-encoder'
-import { BRAND_NAME, formatBranchLine, SOCIAL_LINES } from '@/lib/branch-config'
+import { BRAND_NAME, formatBranchLine, SOCIAL_LINES, stripPusat } from '@/lib/branch-config'
 import { formatWibDateTime } from '@/lib/time'
 
 interface RekapItem {
@@ -385,7 +385,7 @@ function LaporanCard({ sesi, printerWidth }: { sesi: KasirSesi; printerWidth: '5
           </div>
 
           <div style={{ borderTop: '1px dashed var(--color-border)', marginTop: '0.5rem', paddingTop: '0.5rem', textAlign: 'center', fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-            *** REKAPITULASI RESMI ***<br />{sesi.warungNama}
+            *** REKAPITULASI RESMI ***<br />{stripPusat(sesi.warungNama)}
           </div>
         </div>
       )}
@@ -468,7 +468,7 @@ function LaporanCard({ sesi, printerWidth }: { sesi: KasirSesi; printerWidth: '5
         <div className="print-divider" />
         <div className="print-footer">
           <p>*** REKAPITULASI RESMI ***</p>
-          <p>{sesi.warungNama}</p>
+          <p>{stripPusat(sesi.warungNama)}</p>
         </div>
       </div>
     </div>

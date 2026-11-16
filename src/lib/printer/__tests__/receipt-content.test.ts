@@ -142,6 +142,8 @@ describe('buildReceiptLines', () => {
     expect(outletIndex).toBeGreaterThan(brandIndex)
     expect(addressIndex).toBeGreaterThan(outletIndex)
     expect(texts.some((line) => line.includes('Cabang :'))).toBe(false)
+    expect(texts.some((line) => /pusat/i.test(line))).toBe(false)
+    expect(texts.some((line) => line.trim() === 'Seafood Vian Jaya 08 Pinang Ranti')).toBe(true)
   })
 
   it('marks reprints above the shop name', () => {

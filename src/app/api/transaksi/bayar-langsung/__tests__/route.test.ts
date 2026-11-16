@@ -182,7 +182,7 @@ describe('Bayar langsung API', () => {
       nomorMeja: 'Meja 1',
       orderId: 'trx1',
       idempotencyKey: key,
-      metodePembayaran: 'QRIS',
+      metodePembayaran: 'TRANSFER',
       items: [{ menuId: 'menu1', qty: 1 }],
     }))
     const data = await response.json()
@@ -192,7 +192,7 @@ describe('Bayar langsung API', () => {
     expect(create).not.toHaveBeenCalled()
     expect(updateMany).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({ id: 'trx1', status: 'OPEN', shiftId: 'shift1' }),
-      data: expect.objectContaining({ status: 'SELESAI', total: 50000, metodePembayaran: 'QRIS' }),
+      data: expect.objectContaining({ status: 'SELESAI', total: 50000, metodePembayaran: 'TRANSFER' }),
     }))
     expect(findUnique).toHaveBeenCalled()
   })
@@ -232,7 +232,7 @@ describe('Bayar langsung API', () => {
     const response = await POST(makeRequest({
       nomorMeja: 'Meja 1',
       idempotencyKey: key,
-      metodePembayaran: 'QRIS',
+      metodePembayaran: 'TRANSFER',
       items: [{ menuId: 'menu1', qty: 1 }],
     }))
     const data = await response.json()
@@ -265,7 +265,7 @@ describe('Bayar langsung API', () => {
     const response = await POST(makeRequest({
       nomorMeja: 'Meja 1',
       idempotencyKey: key,
-      metodePembayaran: 'QRIS',
+      metodePembayaran: 'TRANSFER',
       items: [{ menuId: 'menu1', qty: 1 }],
     }))
     const data = await response.json()
@@ -289,7 +289,7 @@ describe('Bayar langsung API', () => {
       nomorMeja: 'Meja 1',
       orderId: 'trx1',
       idempotencyKey: key,
-      metodePembayaran: 'QRIS',
+      metodePembayaran: 'TRANSFER',
       items: [{ menuId: 'menu1', qty: 1 }],
     }))
     const data = await response.json()
@@ -298,11 +298,25 @@ describe('Bayar langsung API', () => {
     expect(data.message).toContain('baru saja dibayar')
   })
 
+  it('rejects QRIS because it is no longer an accepted cashier method', async () => {
+    const response = await POST(makeRequest({
+      nomorMeja: 'Meja 1',
+      idempotencyKey: key,
+      metodePembayaran: 'QRIS',
+      items: [{ menuId: 'menu1', qty: 1 }],
+    }))
+    const data = await response.json()
+
+    expect(response.status).toBe(422)
+    expect(data.message).toContain('Metode pembayaran')
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+  })
+
   it('rejects an invalid idempotency key before touching the database', async () => {
     const response = await POST(makeRequest({
       nomorMeja: 'Meja 1',
       idempotencyKey: 'short',
-      metodePembayaran: 'QRIS',
+      metodePembayaran: 'TRANSFER',
       items: [{ menuId: 'menu1', qty: 1 }],
     }))
     const data = await response.json()

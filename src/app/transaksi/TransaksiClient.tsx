@@ -120,7 +120,7 @@ export default function TransaksiClient({ session, menus: initialMenus, initialA
   const [success, setSuccess] = useState('')
   const [activeOrders, setActiveOrders] = useState<ActiveOrder[]>(initialActiveOrders)
   const [selectedOrder, setSelectedOrder] = useState<ActiveOrder | null>(null)
-  const [metodePembayaran, setMetodePembayaran] = useState<'CASH' | 'QRIS' | 'TRANSFER'>('CASH')
+  const [metodePembayaran, setMetodePembayaran] = useState<'CASH' | 'TRANSFER'>('CASH')
   const [completedTransaksi, setCompletedTransaksi] = useState<CompletedTransaksi | null>(null)
   const [showReceiptModal, setShowReceiptModal] = useState(false)
   const [printerWidth, setPrinterWidth] = useState<PrinterWidth>('80mm')
@@ -147,7 +147,7 @@ export default function TransaksiClient({ session, menus: initialMenus, initialA
   const [previewLoading, setPreviewLoading] = useState(false)
   const [previewError, setPreviewError] = useState('')
   const [previewData, setPreviewData] = useState<PreviewNotaData | null>(null)
-  const [bayarLangsungMetode, setBayarLangsungMetode] = useState<'CASH' | 'QRIS' | 'TRANSFER'>('CASH')
+  const [bayarLangsungMetode, setBayarLangsungMetode] = useState<'CASH' | 'TRANSFER'>('CASH')
   const [bayarLangsungUang, setBayarLangsungUang] = useState<number | ''>('')
   const [bayarLangsungError, setBayarLangsungError] = useState('')
   const [idempotencyKey, setIdempotencyKey] = useState(createIdempotencyKey)
@@ -1120,7 +1120,7 @@ export default function TransaksiClient({ session, menus: initialMenus, initialA
                   <strong style={{ fontVariantNumeric: 'tabular-nums' }}>Rp {selectedOrder.total.toLocaleString('id-ID')}</strong>
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
-                  {(['CASH', 'QRIS', 'TRANSFER'] as const).map((method) => (
+                  {(['CASH', 'TRANSFER'] as const).map((method) => (
                     <button
                       key={method}
                       type="button"
@@ -1128,7 +1128,7 @@ export default function TransaksiClient({ session, menus: initialMenus, initialA
                       className={`btn btn-sm ${metodePembayaran === method ? 'btn-primary' : 'btn-ghost'}`}
                       style={{ flex: 1, justifyContent: 'center' }}
                     >
-                      {method === 'CASH' ? <Banknote size={14} /> : method === 'QRIS' ? <CreditCard size={14} /> : <CreditCard size={14} />}
+                      {method === 'CASH' ? <Banknote size={14} /> : <CreditCard size={14} />}
                       {method}
                     </button>
                   ))}
@@ -1410,8 +1410,8 @@ export default function TransaksiClient({ session, menus: initialMenus, initialA
               )}
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '0.5rem', marginBottom: '1rem' }}>
-              {(['CASH', 'QRIS', 'TRANSFER'] as const).map((method) => (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0.5rem', marginBottom: '1rem' }}>
+              {(['CASH', 'TRANSFER'] as const).map((method) => (
                 <button
                   key={method}
                   type="button"

@@ -10,7 +10,7 @@ export const MAX_CHECKOUT_TOTAL = 1_000_000_000
 
 const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9_-]{16,128}$/
 
-export type MetodePembayaranInput = 'CASH' | 'QRIS' | 'TRANSFER'
+export type MetodePembayaranInput = 'CASH' | 'TRANSFER'
 
 export interface CheckoutItemInput {
   menuId: string
@@ -45,7 +45,7 @@ type CashResult =
   | { ok: false; message: string }
 
 export function parseMetodePembayaran(value: unknown): MetodePembayaranInput | null {
-  return value === 'CASH' || value === 'QRIS' || value === 'TRANSFER' ? value : null
+  return value === 'CASH' || value === 'TRANSFER' ? value : null
 }
 
 export function isValidIdempotencyKey(value: unknown): value is string {

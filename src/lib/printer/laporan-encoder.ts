@@ -1,7 +1,7 @@
 import { CHAR_WIDTHS } from './types'
 import { loadReceiptLogo } from './logo'
 import { centerText, createWriter, placeColumns, rightText } from './layout'
-import { DEFAULT_BRANCH_NAME, formatBranchLine, SOCIAL_LINES } from '@/lib/branch-config'
+import { DEFAULT_BRANCH_NAME, formatBranchLine, SOCIAL_LINES, stripPusat } from '@/lib/branch-config'
 import { formatWibShiftRange, formatWibTime } from '@/lib/time'
 import {
   initPrinter,
@@ -100,7 +100,7 @@ export async function encodeLaporan(
     parts.push(setAlign('left'))
   }
 
-  if (warungAlamat && !data.warung.nama) parts.push(center(warungAlamat))
+  if (warungAlamat && !data.warung.nama) parts.push(center(stripPusat(warungAlamat)))
   for (const social of SOCIAL_LINES) parts.push(center(social))
 
   parts.push(emit(drawLine(w)))
