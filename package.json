@@ -12,6 +12,7 @@
     "test:coverage": "vitest run --coverage",
     "android:sync": "npx cap sync android",
     "android:open": "npx cap open android",
+    "icons:android": "node scripts/generate-app-icons.mjs",
     "seed": "npx tsx prisma/seed.ts",
     "postinstall": "prisma generate"
   },
@@ -45,6 +46,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.4",
     "jsdom": "^30.0.1",
+    "sharp": "0.35.4",
     "typescript": "^5",
     "vitest": "^3.2.4"
   },

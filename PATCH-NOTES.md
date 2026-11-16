@@ -56,3 +56,11 @@ No physical D4-504 device is available in this environment. Therefore successful
 - Menambahkan persistensi `active_transport` ke SharedPreferences di `MainActivity.java` agar perangkat mengingat mode USB setelah restart aplikasi.
 - Memperbaiki pencocokan endpoint USB di `UsbPrinter.java` menggunakan perbandingan `getAddress()`.
 - Cetak fisik, perilaku auto cutter, dan koneksi LAN/USB tetap harus diuji pada perangkat dan printer Comson asli.
+
+## Icon Aplikasi (v1.5.6 / version code 15)
+
+- Mengganti ikon launcher default Capacitor dengan `public/logo-app.webp` untuk seluruh density `mipmap-*`.
+- Menambahkan `scripts/generate-app-icons.mjs` (`npm run icons:android`) berbasis `sharp` agar ikon bisa diregenerasi.
+- Adaptive icon (Android 8+) memakai latar `#EAE7DE` dengan logo pada safe zone 66dp; legacy dan round icon memakai latar krem yang sama.
+- `versionCode` 15 / `versionName` 1.5.6. Splash screen dan ikon web/PWA tidak berubah.
+
