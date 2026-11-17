@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Search, ShoppingCart, X, Minus, Plus, Printer, CreditCard, Banknote, CheckCircle, Trash2, Pencil, Eye, Keyboard } from 'lucide-react'
+import { Search, ShoppingCart, X, Minus, Plus, Printer, CreditCard, Banknote, CheckCircle, Trash2, Pencil, Eye, Keyboard, Save } from 'lucide-react'
 import Receipt, { type PrinterWidth } from '@/components/Receipt'
 import NotaPreview, { type NotaPreviewItem } from '@/components/NotaPreview'
 import PrinterSetup from '@/components/PrinterSetup'
@@ -228,6 +228,22 @@ export default function TransaksiClient({ session, menus: initialMenus, initialA
     }
   }, [])
 
+  // Sinkronkan daftar meja lintas kasir: poll berkala + saat tab kembali aktif.
+  // Order yang disimpan kasir lain muncul tanpa reload manual.
+  useEffect(() => {
+    const sync = () => {
+      if (document.visibilityState === 'visible') void loadActiveOrders()
+    }
+    const interval = window.setInterval(sync, 15000)
+    document.addEventListener('visibilitychange', sync)
+    window.addEventListener('focus', sync)
+    return () => {
+      window.clearInterval(interval)
+      document.removeEventListener('visibilitychange', sync)
+      window.removeEventListener('focus', sync)
+    }
+  }, [loadActiveOrders])
+
   function selectOrder(order: ActiveOrder) {
     setSelectedOrder(order)
     setNomorMeja(order.nomorMeja)
@@ -403,18 +419,20 @@ export default function TransaksiClient({ session, menus: initialMenus, initialA
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           nomorMeja: nomorMeja.trim(),
+          idempotencyKey,
           items: cart.map((item) => ({ menuId: item.menuId, qty: item.qty, hargaSatuan: item.hargaSementara ?? item.harga, diskonSatuan: item.diskonSatuan, catatan: item.catatan })),
         }),
       })
       const data = await res.json()
       if (data.success) {
         setSelectedOrder(data.data)
-        setSuccess('Order sementara tersimpan. Cetak struk dilakukan saat pembayaran final.')
+        setSuccess(`Pesanan ${data.data.nomorMeja} disimpan (Rp ${Number(data.data.total).toLocaleString('id-ID')}). Bayar setelah pelanggan selesai makan.`)
         resetIdempotencyKey()
         setCart([])
         await loadActiveOrders()
       } else {
         setError(data.message || 'Gagal menyimpan transaksi.')
+        await loadActiveOrders()
       }
     } catch {
       setError('Koneksi internet bermasalah. Gagal menyimpan transaksi.')
@@ -1090,28 +1108,34 @@ export default function TransaksiClient({ session, menus: initialMenus, initialA
           )}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.25fr) minmax(0, 1fr)', gap: '0.75rem' }}>
-              <button
-                type="button"
-                id="btn-bayar-langsung"
-                onClick={openBayarLangsung}
-                disabled={isKasirClosed || paying || submitting || (cart.length === 0 && !selectedOrder)}
-                className="btn btn-primary"
-                style={{ minHeight: '52px', padding: '0.875rem', fontSize: '1rem', fontWeight: 800, justifyContent: 'center' }}
-              >
-                {paying ? 'Memproses...' : 'BAYAR'}
-              </button>
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.3fr) minmax(0, 1fr)', gap: '0.75rem' }}>
               <button
                 type="button"
                 id="btn-simpan-transaksi"
                 onClick={handleCheckout}
                 disabled={isKasirClosed || submitting || paying || cart.length === 0}
+                className="btn btn-primary"
+                style={{ minHeight: '52px', padding: '0.875rem', fontSize: '1rem', fontWeight: 800, justifyContent: 'center', gap: '0.5rem' }}
+              >
+                <Save size={18} /> {submitting ? 'Menyimpan...' : 'SIMPAN PESANAN'}
+              </button>
+              <button
+                type="button"
+                id="btn-bayar-langsung"
+                onClick={openBayarLangsung}
+                disabled={isKasirClosed || paying || submitting || (cart.length === 0 && !selectedOrder)}
                 className="btn btn-ghost"
                 style={{ minHeight: '52px', padding: '0.875rem', fontSize: '0.95rem', fontWeight: 700, justifyContent: 'center', border: '1px solid var(--color-border)' }}
               >
-                {submitting ? 'Menyimpan...' : 'SIMPAN'}
+                {paying ? 'Memproses...' : 'BAYAR'}
               </button>
             </div>
+
+            {cart.length > 0 && (
+              <p className="text-secondary" style={{ margin: 0, fontSize: '0.75rem', textAlign: 'center' }}>
+                Simpan pesanan dulu bila pelanggan belum selesai makan. Pembayaran bisa dilakukan nanti dari daftar Meja Aktif.
+              </p>
+            )}
 
             {selectedOrder && (
               <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '0.75rem' }}>

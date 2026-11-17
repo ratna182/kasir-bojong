@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { getAuthContext, getKasirWarungId, requireKasirAccess } from '@/lib/auth'
+import { apiRateLimiter } from '@/lib/rate-limiter'
 import { getOpenShift } from '@/lib/kasir-shift'
 import { getStoreDayRange } from '@/lib/time'
 import { VALID_TABLE_NAMES } from '@/lib/table-layout'
 import { isRupiahAmount } from '@/lib/rupiah'
+import { isValidIdempotencyKey, MAX_ITEM_QTY, MAX_UNIT_PRICE } from '@/lib/transaksi-checkout'
 
 type IncomingItem = {
   menuId: string
@@ -15,25 +17,53 @@ type IncomingItem = {
   catatan?: string
 }
 
+const TRANSAKSI_INCLUDE = {
+  items: { orderBy: { createdAt: 'asc' as const } },
+} as const
+
+function isPrismaError(error: unknown, code: string) {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === code
+}
+
 function isUniqueOpenOrderError(error: unknown) {
-  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002'
+  return isPrismaError(error, 'P2002')
+}
+
+function isTransactionConflict(error: unknown) {
+  return isPrismaError(error, 'P2034')
 }
 
 // POST /api/transaksi - buat/append order sementara (kasir only)
 export async function POST(request: NextRequest) {
+  let warungId: string | null = null
+  let nomorMeja = ''
+  let idempotencyKey: string | null = null
+
   try {
     const context = getAuthContext(request)
     const authError = await requireKasirAccess(context)
     if (authError) return authError
 
-    const warungId = await getKasirWarungId(context)
+    warungId = await getKasirWarungId(context)
     if (!warungId) {
       return NextResponse.json({ success: false, message: 'Kasir tidak terdaftar di warung.' }, { status: 403 })
     }
+    const activeWarungId = warungId
+
+    const rateLimitKey = `simpan-order:${activeWarungId}:${context!.user.id}`
+    const { allowed } = apiRateLimiter.check(rateLimitKey)
+    if (!allowed) {
+      return NextResponse.json({ success: false, message: 'Terlalu banyak request. Coba lagi sebentar.' }, { status: 429 })
+    }
 
     const body = await request.json()
-    const nomorMeja = body.nomorMeja?.toString().trim()
+    nomorMeja = body.nomorMeja?.toString().trim() ?? ''
     const items = body.items as IncomingItem[] | undefined
+    const rawIdempotencyKey = body.idempotencyKey
+    if (rawIdempotencyKey !== undefined && rawIdempotencyKey !== null && !isValidIdempotencyKey(rawIdempotencyKey)) {
+      return NextResponse.json({ success: false, message: 'Kunci penyimpanan tidak valid.' }, { status: 422 })
+    }
+    idempotencyKey = isValidIdempotencyKey(rawIdempotencyKey) ? rawIdempotencyKey : null
 
     if (!nomorMeja) {
       return NextResponse.json({ success: false, message: 'Nomor meja wajib diisi.' }, { status: 422 })
@@ -50,11 +80,11 @@ export async function POST(request: NextRequest) {
 
     for (const item of items) {
       const qty = Number(item.qty)
-      if (!item.menuId || !Number.isInteger(qty) || qty < 1) {
-        return NextResponse.json({ success: false, message: 'Qty harus minimal 1.' }, { status: 422 })
+      if (!item.menuId || !Number.isInteger(qty) || qty < 1 || qty > MAX_ITEM_QTY) {
+        return NextResponse.json({ success: false, message: `Qty harus antara 1 dan ${MAX_ITEM_QTY}.` }, { status: 422 })
       }
-      if ((item.hargaSatuan !== undefined && !isRupiahAmount(item.hargaSatuan)) ||
-        (item.diskonSatuan !== undefined && !isRupiahAmount(item.diskonSatuan)) ||
+      if ((item.hargaSatuan !== undefined && (!isRupiahAmount(item.hargaSatuan) || item.hargaSatuan > MAX_UNIT_PRICE)) ||
+        (item.diskonSatuan !== undefined && (!isRupiahAmount(item.diskonSatuan) || item.diskonSatuan > MAX_UNIT_PRICE)) ||
         (item.catatan !== undefined && (typeof item.catatan !== 'string' || item.catatan.length > 160))) {
         return NextResponse.json({ success: false, message: 'Penyesuaian item tidak valid.' }, { status: 422 })
       }
@@ -62,8 +92,8 @@ export async function POST(request: NextRequest) {
 
     const menuIds = [...new Set(items.map((item) => item.menuId))]
     const menus = await prisma.menu.findMany({
-      where: { id: { in: menuIds }, warungId, isAktif: true },
-      include: { warungMenus: { where: { warungId }, select: { harga: true } } },
+      where: { id: { in: menuIds }, warungId: activeWarungId, isAktif: true },
+      include: { warungMenus: { where: { warungId: activeWarungId }, select: { harga: true } } },
     })
 
     if (menus.length !== menuIds.length) {
@@ -96,55 +126,121 @@ export async function POST(request: NextRequest) {
       })
     }
     const addedTotal = processedItems.reduce((sum, item) => sum + item.subtotal, 0)
+    const saveKey = idempotencyKey
 
-    const transaksi = await prisma.$transaction(async (tx) => {
-      const shift = await getOpenShift(tx, warungId)
-      if (!shift) return 'CLOSED' as const
+    const runSave = () => prisma.$transaction(async (tx) => {
+      const shift = await getOpenShift(tx, activeWarungId)
+      if (!shift) return { type: 'CLOSED' as const }
+
+      if (saveKey) {
+        const existingByKey = await tx.transaksi.findFirst({
+          where: { warungId: activeWarungId, idempotencyKey: saveKey },
+          include: TRANSAKSI_INCLUDE,
+        })
+        if (existingByKey) {
+          if (existingByKey.status === 'OPEN' && existingByKey.nomorMeja === nomorMeja) {
+            return { type: 'SAVED' as const, transaksi: existingByKey, idempotent: true }
+          }
+          return { type: 'KEY_CONFLICT' as const }
+        }
+      }
 
       const existing = await tx.transaksi.findFirst({
-        where: { warungId, nomorMeja, status: 'OPEN', shiftId: shift.id },
+        where: { warungId: activeWarungId, nomorMeja, status: 'OPEN', shiftId: shift.id },
       })
 
       if (!existing) {
-        return tx.transaksi.create({
+        const created = await tx.transaksi.create({
           data: {
-            warungId,
+            warungId: activeWarungId,
             kasirId,
             shiftId: shift.id,
             nomorMeja,
             status: 'OPEN',
             total: addedTotal,
             tanggal: getStoreDayRange(shift.dibukaPada ?? new Date()).today,
+            ...(saveKey ? { idempotencyKey: saveKey } : {}),
             items: { create: processedItems },
           },
-          include: { items: { orderBy: { createdAt: 'asc' } } },
+          include: TRANSAKSI_INCLUDE,
         })
+        return { type: 'SAVED' as const, transaksi: created, idempotent: false }
       }
 
       await tx.transaksiItem.createMany({
         data: processedItems.map((item) => ({ ...item, transaksiId: existing.id })),
       })
 
-      return tx.transaksi.update({
+      const updated = await tx.transaksi.update({
         where: { id: existing.id },
-        data: { total: existing.total + addedTotal },
-        include: { items: { orderBy: { createdAt: 'asc' } } },
+        data: {
+          total: existing.total + addedTotal,
+          ...(saveKey ? { idempotencyKey: saveKey } : {}),
+        },
+        include: TRANSAKSI_INCLUDE,
       })
+      return { type: 'SAVED' as const, transaksi: updated, idempotent: false }
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
 
-    if (transaksi === 'CLOSED') {
+    const saveWithRetry = async () => {
+      for (let attempt = 1; ; attempt++) {
+        try {
+          return await runSave()
+        } catch (error) {
+          if (attempt < 2 && isTransactionConflict(error)) continue
+          throw error
+        }
+      }
+    }
+
+    const result = await saveWithRetry()
+
+    if (result.type === 'CLOSED') {
       return NextResponse.json({
         success: false,
         message: 'Buka kasir terlebih dahulu.',
       }, { status: 409 })
     }
 
-    return NextResponse.json({ success: true, data: transaksi }, { status: 201 })
+    if (result.type === 'KEY_CONFLICT') {
+      return NextResponse.json({
+        success: false,
+        message: 'Penyimpanan ini sudah dipakai transaksi lain. Muat ulang halaman.',
+      }, { status: 409 })
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: result.transaksi,
+      meta: { idempotent: result.idempotent },
+    }, { status: result.idempotent ? 200 : 201 })
   } catch (error) {
     if (isUniqueOpenOrderError(error)) {
+      if (warungId && idempotencyKey) {
+        const existing = await prisma.transaksi.findFirst({
+          where: { warungId, idempotencyKey },
+          include: TRANSAKSI_INCLUDE,
+        })
+        if (existing) {
+          if (existing.nomorMeja === nomorMeja && existing.status === 'OPEN') {
+            return NextResponse.json({ success: true, data: existing, meta: { idempotent: true } }, { status: 200 })
+          }
+          return NextResponse.json({
+            success: false,
+            message: 'Penyimpanan ini sudah dipakai transaksi lain. Muat ulang halaman.',
+          }, { status: 409 })
+        }
+      }
       return NextResponse.json({
         success: false,
         message: 'Meja ini sudah ada order aktif, refresh dan lanjutkan order yang sudah ada.',
+      }, { status: 409 })
+    }
+
+    if (isTransactionConflict(error)) {
+      return NextResponse.json({
+        success: false,
+        message: 'Penyimpanan sedang diproses oleh kasir lain. Coba lagi.',
       }, { status: 409 })
     }
 

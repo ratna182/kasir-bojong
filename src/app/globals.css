@@ -1222,7 +1222,7 @@ input[type='checkbox']:checked::after { transform: rotate(45deg) scale(1); }
   .badge { font-size: 0.7rem; padding: 0.15rem 0.5rem; }
 
   /* POS grid */
-  .pos-grid { gap: 0.75rem; }
+  .pos-grid { grid-template-columns: 1fr; gap: 0.75rem; }
   .pos-grid > div:last-child { order: -1; }
 }
 
