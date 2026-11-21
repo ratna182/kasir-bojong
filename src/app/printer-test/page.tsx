@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { printer } from '@/lib/printer'
 import { iminPrinter } from '@/lib/printer/imin-sdk'
 import { loadPrinterConfig } from '@/lib/printer/storage'
-import { compose, drawLine, feedAndCut, initPrinter, setAlign, setBold, setText } from '@/lib/printer/escpos'
+import { compose, drawLine, feedAndCut, initPrinter, setAlign, setBold, setText, CUT_FEED_LINES } from '@/lib/printer/escpos'
 import type { UsbPrinterInfo } from '@/lib/printer/types'
 
 export default function PrinterTestPage() {
@@ -122,7 +122,7 @@ export default function PrinterTestPage() {
       setText('Qty 2                      Rp 20.000\n'),
       setText(`${drawLine(columns)}\nTOTAL                      Rp 30.000\n`),
       setText('TES CETAK OK\n'),
-      feedAndCut(4),
+      feedAndCut(CUT_FEED_LINES),
     )
     const result = await printer.printReceipt(data, jobId)
     const text = typeof result === 'boolean' ? `ok=${result} error=${printer.error}` : `job=${jobId} ${JSON.stringify(result)}`

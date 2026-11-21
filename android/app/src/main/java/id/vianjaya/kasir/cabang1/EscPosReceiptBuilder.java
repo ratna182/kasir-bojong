@@ -72,7 +72,7 @@ public final class EscPosReceiptBuilder {
         text(out, "TES CETAK OK", width);
         command(out, ESC, 0x45, 0x00);
         command(out, ESC, 0x61, 0x00);
-        command(out, ESC, 0x64, 0x04); // feed four lines
+        command(out, ESC, 0x64, 0x0A); // feed ten lines so the cutter cannot clip the footer
         command(out, GS, 0x56, 0x42, 0x00); // cut; devices without cutters ignore it
         return out.toByteArray();
     }

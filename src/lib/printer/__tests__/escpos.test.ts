@@ -31,11 +31,11 @@ describe('encodeRasterImage', () => {
 })
 
 describe('feedAndCut', () => {
-  it('feeds six lines before the full cut used by the Comson auto cutter', () => {
+  it('feeds enough lines to clear the cutter before the full cut used by the Comson', () => {
     const output = feedAndCut(CUT_FEED_LINES)
 
-    expect(CUT_FEED_LINES).toBe(6)
-    expect(Array.from(output.slice(0, CUT_FEED_LINES))).toEqual([0x0A, 0x0A, 0x0A, 0x0A, 0x0A, 0x0A])
+    expect(CUT_FEED_LINES).toBe(10)
+    expect(Array.from(output.slice(0, CUT_FEED_LINES))).toEqual(Array(CUT_FEED_LINES).fill(0x0A))
     expect(Array.from(output.slice(CUT_FEED_LINES))).toEqual([0x1D, 0x56, 0x00])
   })
 })

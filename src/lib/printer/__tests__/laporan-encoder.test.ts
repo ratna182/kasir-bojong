@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { encodeLaporan, type LaporanData } from '../laporan-encoder'
+import { CUT_FEED_LINES } from '../escpos'
 
 const logo = vi.hoisted(() => ({ load: vi.fn(async (): Promise<Uint8Array | null> => null) }))
 vi.mock('../logo', () => ({
@@ -7,7 +8,7 @@ vi.mock('../logo', () => ({
   clearReceiptLogoCache: () => {},
 }))
 
-const CUT_TAIL = [0x1B, 0x33, 20, 0x0A, 0x0A, 0x0A, 0x0A, 0x0A, 0x0A, 0x1D, 0x56, 0x00]
+const CUT_TAIL = [0x1B, 0x33, 20, ...Array(CUT_FEED_LINES).fill(0x0A), 0x1D, 0x56, 0x00]
 
 const DATA: LaporanData = {
   tanggal: '2026-09-16',
