@@ -23,11 +23,18 @@ export function feedAndCut(lines: number = 3): Uint8Array {
 
 /**
  * Feeds before the cut. Without it the last lines of a receipt stay behind the cutter and are lost,
- * which is how the footer disappeared on the device. The head-to-cutter gap on the Comson 80mm is
- * about 20mm; at 2.5mm per line (ESC 3 20) six lines only reached 15mm and left the last two footer
- * lines on the next slip. Ten lines (25mm) clear the cutter with a 5mm spare strip.
+ * which is how the footer disappeared on the device. Measured on the Comson 80mm (Pinang Ranti):
+ * the head-to-cutter gap is about 26mm, so at 2.5mm per line (ESC 3 20) ten lines (25mm) left the
+ * last footer line sitting on the cutter and half-clipped. Twelve lines (30mm) keep it fully above
+ * the blade with only ~4mm of blank tail, which is the least paper it can waste without clipping.
+ * Go lower than this and the footer gets shaved again; the only cost of going higher is a longer
+ * empty strip under the receipt.
+ *
+ * The blank strip above the logo on each fresh receipt is this same head-to-cutter distance. It is
+ * physical (paper between the print head and the cutter cannot be printed on) and is not affected by
+ * this value, so it cannot be trimmed from the app no matter what this is set to.
  */
-export const CUT_FEED_LINES = 10
+export const CUT_FEED_LINES = 12
 
 export function setText(text: string): Uint8Array {
   return textEncoder(text.normalize('NFKD').replace(/[^\x20-\x7E\n\r]/g, '?'))

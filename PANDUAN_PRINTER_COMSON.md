@@ -48,7 +48,7 @@ Catatan:
 
 ## 4. Auto Cutter
 
-Struk diakhiri dengan 4 baris kosong lalu perintah potong `GS V 0`. Jika printer tidak memotong:
+Struk diakhiri dengan 12 baris kosong (sekitar 30mm) lalu perintah potong `GS V 0`. Jumlah ini adalah batas paling hemat: cukup agar baris footer terakhir lolos dari pisau dengan sisa kosong hanya sekitar 4mm, tetapi bila dikurangi lagi teks footer berisiko tergores. Jarak kosong di bagian atas struk bukan berasal dari setelan ini, melainkan jarak fisik print head ke pisau potong (sekitar 26mm) yang tidak dapat dicetak. Jika printer tidak memotong:
 
 1. Pastikan model printer memang memiliki auto cutter.
 2. Coba perintah potong alternatif `GS V 66 0` pada firmware/printer yang mendukung.
