@@ -51,3 +51,5 @@ next-env.d.ts
 .dev.vars
 .open-next
 .wrangler
+*.dump
+*.sql

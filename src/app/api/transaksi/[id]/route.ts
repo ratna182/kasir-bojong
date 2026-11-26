@@ -20,10 +20,10 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     }
 
     // Hapus items dulu, lalu transaksi
-    await prisma.$transaction([
-      prisma.transaksiItem.deleteMany({ where: { transaksiId: id } }),
-      prisma.transaksi.delete({ where: { id } }),
-    ])
+    await prisma.$transaction(async (tx) => {
+      await tx.transaksiItem.deleteMany({ where: { transaksiId: id } })
+      await tx.transaksi.delete({ where: { id } })
+    })
 
     return NextResponse.json({ success: true, message: 'Pesanan berhasil dihapus.' })
   } catch (error) {

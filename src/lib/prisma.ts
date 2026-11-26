@@ -1,24 +1,13 @@
 import { PrismaClient } from '@prisma/client'
-import { neonConfig } from '@neondatabase/serverless'
-import { PrismaNeon } from '@prisma/adapter-neon'
-import ws from 'ws'
+import { PrismaPg } from '@prisma/adapter-pg'
 
 function getPrismaClient(): PrismaClient {
   const connectionString = process.env.DATABASE_URL
   if (!connectionString) {
-    return new PrismaClient({
-      log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
-    })
+    throw new Error('DATABASE_URL is not set')
   }
 
-  // Pada environment Node.js lokal tanpa native WebSocket, gunakan ws
-  if (typeof WebSocket === 'undefined') {
-    neonConfig.webSocketConstructor = ws
-  }
-  // Gunakan HTTP fetch untuk query tunggal agar tidak menggantung di Cloudflare Workers
-  neonConfig.poolQueryViaFetch = true
-
-  const adapter = new PrismaNeon({ connectionString })
+  const adapter = new PrismaPg({ connectionString, maxUses: 1 })
 
   return new PrismaClient({
     adapter,
