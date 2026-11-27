@@ -1,6 +1,6 @@
 import type { CapacitorConfig } from '@capacitor/cli'
 
-const serverUrl = process.env.CAPACITOR_SERVER_URL || 'https://kasir-pinang-ranti.vianjaya-pos.workers.dev'
+const serverUrl = process.env.CAPACITOR_SERVER_URL || 'https://kasir-pinang-ranti.vrtx-lab.workers.dev'
 
 if (serverUrl && !/^https:\/\//.test(serverUrl)) {
   throw new Error('CAPACITOR_SERVER_URL harus menggunakan HTTPS')
@@ -8,7 +8,6 @@ if (serverUrl && !/^https:\/\//.test(serverUrl)) {
 
 const allowedHosts = [
   new URL(serverUrl).hostname,
-  'kasir-pinang-ranti.vianjaya-pos.workers.dev',
   'kasir-bojongkulur.vercel.app',
 ]
 
