@@ -55,6 +55,21 @@ describe('createReceiptData', () => {
     const receipt = makeReceipt({ metodePembayaran: 'CASH' })
     expect(receipt.kembalian).toBeUndefined()
   })
+
+  it('reads split portions and cash change from the saved transaction', () => {
+    const receipt = makeReceipt({
+      metodePembayaran: 'SPLIT',
+      total: 100000,
+      jumlahTransfer: 40000,
+      jumlahCash: 60000,
+      uangDiterima: 75000,
+      kembalian: 15000,
+    })
+    expect(receipt.jumlahCash).toBe(60000)
+    expect(receipt.jumlahTransfer).toBe(40000)
+    expect(receipt.uangDiterima).toBe(75000)
+    expect(receipt.kembalian).toBe(15000)
+  })
 })
 
 describe('buildReceiptLines', () => {
@@ -146,6 +161,18 @@ describe('buildReceiptLines', () => {
     expect(texts.some((line) => line.trim() === 'Seafood Vian Jaya 08 Pinang Ranti')).toBe(true)
   })
 
+  it('prints cash and transfer portions with change from the cash portion', () => {
+    const texts = textsOf(makeReceipt(
+      { metodePembayaran: 'SPLIT', total: 100000, jumlahTransfer: 40000, jumlahCash: 60000 },
+      { uangDiterima: 75000, kembalian: 15000 },
+    ))
+
+    expect(texts.some((line) => line.startsWith('Bayar (Cash)') && /Rp\s+60\.000$/.test(line))).toBe(true)
+    expect(texts.some((line) => line.startsWith('Bayar (Transfer)') && /Rp\s+40\.000$/.test(line))).toBe(true)
+    expect(texts.some((line) => line.startsWith('Uang diterima') && /Rp\s+75\.000$/.test(line))).toBe(true)
+    expect(texts.some((line) => line.startsWith('Kembali') && /Rp\s+15\.000$/.test(line))).toBe(true)
+  })
+
   it('marks reprints above the shop name', () => {
     const texts = textsOf(makeReceipt({}, { reprint: true }))
     expect(texts.findIndex((line) => line.includes('CETAK ULANG'))).toBeLessThan(
@@ -165,6 +192,7 @@ describe('paymentLabel', () => {
     expect(paymentLabel('CASH')).toBe('Cash')
     expect(paymentLabel('QRIS')).toBe('QRIS')
     expect(paymentLabel('TRANSFER')).toBe('Transfer')
+    expect(paymentLabel('SPLIT')).toBe('Cash + Transfer')
     expect(paymentLabel(null)).toBe('-')
     expect(paymentLabel('DEBIT')).toBe('-')
   })

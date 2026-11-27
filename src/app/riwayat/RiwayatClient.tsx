@@ -308,7 +308,7 @@ function LaporanCard({ sesi, printerWidth }: { sesi: KasirSesi; printerWidth: '5
                   <tr key={i}>
                     <td style={{ padding: '0.15rem 0' }}>{tx.nomorMeja}</td>
                     <td style={{ padding: '0.15rem 0' }}>{new Date(tx.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</td>
-                    <td style={{ padding: '0.15rem 0' }}>{tx.metodePembayaran === 'QRIS' ? 'QRIS' : tx.metodePembayaran === 'TRANSFER' ? 'TRSF' : 'CASH'}</td>
+                    <td style={{ padding: '0.15rem 0' }}>{tx.metodePembayaran === 'QRIS' ? 'QRIS' : tx.metodePembayaran === 'TRANSFER' ? 'TRSF' : tx.metodePembayaran === 'SPLIT' ? 'SPLIT' : 'CASH'}</td>
                     <td style={{ padding: '0.15rem 0', textAlign: 'right' }}>{tx.total.toLocaleString('id-ID')}</td>
                   </tr>
                 ))}
@@ -421,7 +421,7 @@ function LaporanCard({ sesi, printerWidth }: { sesi: KasirSesi; printerWidth: '5
               <tr key={i}>
                 <td>{tx.nomorMeja}</td>
                 <td>{new Date(tx.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</td>
-                <td>{tx.metodePembayaran === 'QRIS' ? 'QRIS' : tx.metodePembayaran === 'TRANSFER' ? 'TRSF' : 'CASH'}</td>
+                <td>{tx.metodePembayaran === 'QRIS' ? 'QRIS' : tx.metodePembayaran === 'TRANSFER' ? 'TRSF' : tx.metodePembayaran === 'SPLIT' ? 'SPLIT' : 'CASH'}</td>
                 <td className="text-right">{tx.total.toLocaleString('id-ID')}</td>
               </tr>
             ))}

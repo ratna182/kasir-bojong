@@ -13,7 +13,7 @@ import { isRupiahAmount } from '@/lib/rupiah'
 import { printer } from '@/lib/printer'
 import { loadPrinterConfig } from '@/lib/printer/storage'
 import { encodeReceipt } from '@/lib/printer/receipt-encoder'
-import { hitungKembalian, generateQuickAmounts } from '@/lib/payment/cash'
+import { hitungKembalian, hitungSplitPembayaran, generateQuickAmounts } from '@/lib/payment/cash'
 import { QUICK_TABLES, LESEHAN, TABLE_LIMITS, TABLE_ROWS, buildTableName, type TableKind, type TableRow } from '@/lib/table-layout'
 import { sortByName } from '@/lib/menu-sort'
 
@@ -36,11 +36,17 @@ interface CartItem {
   catatan: string
 }
 
+type PaymentMethod = 'CASH' | 'TRANSFER' | 'SPLIT'
+
 interface CompletedTransaksi {
   id: string
   nomorMeja: string
   total: number
   metodePembayaran?: string | null
+  jumlahCash?: number | null
+  jumlahTransfer?: number | null
+  uangDiterima?: number | null
+  kembalian?: number | null
   tanggal: string
   createdAt: string
   items: Array<{
@@ -60,8 +66,10 @@ type ActiveOrder = CompletedTransaksi & {
 }
 
 type ReceiptPaymentMeta = {
-  uangDiterima: number
-  kembalian: number
+  uangDiterima?: number
+  kembalian?: number
+  jumlahCash?: number
+  jumlahTransfer?: number
 }
 
 type PreviewNotaData = {
@@ -100,6 +108,50 @@ function createIdempotencyKey() {
   return `${Date.now()}${Math.random().toString(36).slice(2)}`
 }
 
+function SplitPaymentFields({
+  total,
+  jumlahTransfer,
+  uangDiterima,
+  onTransferChange,
+  onUangChange,
+  result,
+  compact = false,
+}: {
+  total: number
+  jumlahTransfer: number | ''
+  uangDiterima: number | ''
+  onTransferChange: (value: number | '') => void
+  onUangChange: (value: number | '') => void
+  result: ReturnType<typeof hitungSplitPembayaran> | null
+  compact?: boolean
+}) {
+  const inputStyle = { fontSize: compact ? '1.05rem' : '1.15rem', padding: compact ? '0.6rem' : '0.65rem', width: '100%', fontWeight: 700, minHeight: compact ? '44px' : undefined }
+  const porsiCash = result?.jumlahCash ?? (jumlahTransfer === '' ? null : total - jumlahTransfer)
+
+  return (
+    <div style={{ marginBottom: compact ? '1rem' : '0.75rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0.5rem' }}>
+        <div>
+          <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-secondary)', marginBottom: '0.35rem' }}>Nominal Transfer</label>
+          <RupiahInput placeholder="Transfer" value={jumlahTransfer} onValueChange={onTransferChange} className="form-input" ariaLabel="Nominal transfer" style={inputStyle} />
+        </div>
+        <div>
+          <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-secondary)', marginBottom: '0.35rem' }}>Uang Cash</label>
+          <RupiahInput placeholder="Cash diterima" value={uangDiterima} onValueChange={onUangChange} className="form-input" ariaLabel="Uang cash diterima" style={inputStyle} />
+        </div>
+      </div>
+      <div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', marginTop: '0.4rem' }}>
+        Porsi cash: Rp {porsiCash !== null && porsiCash > 0 ? porsiCash.toLocaleString('id-ID') : '0'} · Total Rp {total.toLocaleString('id-ID')}
+      </div>
+      {result && (
+        <div style={{ fontSize: compact ? '1.1rem' : '1.35rem', fontWeight: 800, color: result.isValid ? 'var(--color-success)' : 'var(--color-danger)', marginTop: '0.5rem', textAlign: 'center' }}>
+          {result.message}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function TransaksiClient({ session, menus: initialMenus, initialActiveOrders, isKasirClosed, isShiftOvertime }: TransaksiClientProps) {
   const isKranggan = session.username.toLowerCase().includes('kranggan') || session.warungNama?.toLowerCase().includes('kranggan')
   const isPinangRanti = !isKranggan
@@ -120,7 +172,7 @@ export default function TransaksiClient({ session, menus: initialMenus, initialA
   const [success, setSuccess] = useState('')
   const [activeOrders, setActiveOrders] = useState<ActiveOrder[]>(initialActiveOrders)
   const [selectedOrder, setSelectedOrder] = useState<ActiveOrder | null>(null)
-  const [metodePembayaran, setMetodePembayaran] = useState<'CASH' | 'TRANSFER'>('CASH')
+  const [metodePembayaran, setMetodePembayaran] = useState<PaymentMethod>('CASH')
   const [completedTransaksi, setCompletedTransaksi] = useState<CompletedTransaksi | null>(null)
   const [showReceiptModal, setShowReceiptModal] = useState(false)
   const [printerWidth, setPrinterWidth] = useState<PrinterWidth>('80mm')
@@ -140,6 +192,7 @@ export default function TransaksiClient({ session, menus: initialMenus, initialA
   const [showPrinterSetup, setShowPrinterSetup] = useState(false)
   const [printing, setPrinting] = useState(false)
   const [uangDiterima, setUangDiterima] = useState<number | ''>('')
+  const [jumlahTransfer, setJumlahTransfer] = useState<number | ''>('')
   const [kembalianResult, setKembalianResult] = useState<ReturnType<typeof hitungKembalian> | null>(null)
   const [receiptPayment, setReceiptPayment] = useState<ReceiptPaymentMeta | null>(null)
   const [showBayarLangsung, setShowBayarLangsung] = useState(false)
@@ -147,9 +200,12 @@ export default function TransaksiClient({ session, menus: initialMenus, initialA
   const [previewLoading, setPreviewLoading] = useState(false)
   const [previewError, setPreviewError] = useState('')
   const [previewData, setPreviewData] = useState<PreviewNotaData | null>(null)
-  const [bayarLangsungMetode, setBayarLangsungMetode] = useState<'CASH' | 'TRANSFER'>('CASH')
+  const [bayarLangsungMetode, setBayarLangsungMetode] = useState<PaymentMethod>('CASH')
   const [bayarLangsungUang, setBayarLangsungUang] = useState<number | ''>('')
+  const [bayarLangsungTransfer, setBayarLangsungTransfer] = useState<number | ''>('')
   const [bayarLangsungError, setBayarLangsungError] = useState('')
+  const [completedList, setCompletedList] = useState<CompletedTransaksi[]>([])
+  const [isReprint, setIsReprint] = useState(false)
   const [idempotencyKey, setIdempotencyKey] = useState(createIdempotencyKey)
 
   useEffect(() => {
@@ -215,6 +271,11 @@ export default function TransaksiClient({ session, menus: initialMenus, initialA
     }
     setKembalianResult(hitungKembalian(uangDiterima, selectedOrder.total))
   }, [uangDiterima, selectedOrder?.total, metodePembayaran])
+
+  const splitResult = useMemo(() => {
+    if (metodePembayaran !== 'SPLIT' || !selectedOrder || jumlahTransfer === '' || uangDiterima === '') return null
+    return hitungSplitPembayaran(selectedOrder.total, jumlahTransfer, uangDiterima)
+  }, [metodePembayaran, selectedOrder, jumlahTransfer, uangDiterima])
 
   const loadActiveOrders = useCallback(async () => {
     const res = await fetch('/api/transaksi/open')
@@ -389,10 +450,15 @@ export default function TransaksiClient({ session, menus: initialMenus, initialA
     setError('')
     setSuccess('')
     setUangDiterima('')
+    setMetodePembayaran('CASH')
+    setJumlahTransfer('')
     setShowBayarLangsung(false)
     setShowPreviewNota(false)
+    setBayarLangsungMetode('CASH')
     setBayarLangsungUang('')
+    setBayarLangsungTransfer('')
     setBayarLangsungError('')
+    setIsReprint(false)
   }
 
   const grandTotal = useMemo(() => cart.reduce((sum, item) => sum + itemUnitPrice(item) * item.qty, 0), [cart])
@@ -404,6 +470,10 @@ export default function TransaksiClient({ session, menus: initialMenus, initialA
     if (bayarLangsungMetode !== 'CASH' || bayarLangsungUang === '' || bayarLangsungUang < 0) return null
     return hitungKembalian(bayarLangsungUang, bayarLangsungTotal)
   }, [bayarLangsungMetode, bayarLangsungUang, bayarLangsungTotal])
+  const bayarLangsungSplit = useMemo(() => {
+    if (bayarLangsungMetode !== 'SPLIT' || bayarLangsungTransfer === '' || bayarLangsungUang === '') return null
+    return hitungSplitPembayaran(bayarLangsungTotal, bayarLangsungTransfer, bayarLangsungUang)
+  }, [bayarLangsungMetode, bayarLangsungTransfer, bayarLangsungUang, bayarLangsungTotal])
 
   async function handleCheckout() {
     setError('')
@@ -441,7 +511,7 @@ export default function TransaksiClient({ session, menus: initialMenus, initialA
     }
   }
 
-  async function handlePrintTransaction(transaksi: CompletedTransaksi, payment: ReceiptPaymentMeta | null) {
+  async function handlePrintTransaction(transaksi: CompletedTransaksi, payment: ReceiptPaymentMeta | null, reprint = false) {
     setPrinting(true)
     try {
       const encoded = await encodeReceipt({
@@ -453,7 +523,8 @@ export default function TransaksiClient({ session, menus: initialMenus, initialA
         warungAlamat: session.warungAlamat,
         width: printerWidth,
         uangDiterima: payment?.uangDiterima,
-        kembalian: payment?.kembalian
+        kembalian: payment?.kembalian,
+        reprint
       })
 
       const jobId = `${transaksi.id}-${printJobSeq.current++}`
@@ -476,7 +547,26 @@ export default function TransaksiClient({ session, menus: initialMenus, initialA
 
   async function handlePrintReceipt() {
     if (!completedTransaksi) return
-    await handlePrintTransaction(completedTransaksi, receiptPayment)
+    await handlePrintTransaction(completedTransaksi, receiptPayment, isReprint)
+  }
+
+  const loadCompleted = useCallback(async () => {
+    const res = await fetch('/api/transaksi')
+    const data = await res.json()
+    if (data.success) setCompletedList(data.data)
+  }, [])
+
+  function handleOpenReprint(transaksi: CompletedTransaksi) {
+    setCompletedTransaksi(transaksi)
+    setReceiptPayment({
+      uangDiterima: transaksi.uangDiterima ?? undefined,
+      kembalian: transaksi.kembalian ?? undefined,
+      jumlahCash: transaksi.jumlahCash ?? undefined,
+      jumlahTransfer: transaksi.jumlahTransfer ?? undefined,
+    })
+    setIsReprint(true)
+    setError('')
+    setShowReceiptModal(true)
   }
 
   async function handleUpdateSavedItem(itemId: string, qty: number) {
@@ -584,6 +674,16 @@ export default function TransaksiClient({ session, menus: initialMenus, initialA
     void handleCheckout()
   }
 
+  function toReceiptPayment(cash: Record<string, unknown> | null | undefined): ReceiptPaymentMeta | null {
+    if (!cash) return null
+    return {
+      uangDiterima: cash.uangDiterima === undefined ? undefined : Number(cash.uangDiterima),
+      kembalian: cash.kembalian === undefined ? undefined : Number(cash.kembalian),
+      jumlahCash: cash.jumlahCash === undefined ? undefined : Number(cash.jumlahCash),
+      jumlahTransfer: cash.jumlahTransfer === undefined ? undefined : Number(cash.jumlahTransfer),
+    }
+  }
+
   async function handleBayarLangsung() {
     if (isKasirClosed) { setBayarLangsungError('Buka kasir terlebih dahulu.'); return }
     if (!nomorMeja.trim()) { setBayarLangsungError('Harap masukkan nomor meja atau pilih dari tombol meja.'); return }
@@ -592,6 +692,16 @@ export default function TransaksiClient({ session, menus: initialMenus, initialA
       if (bayarLangsungUang === '') { setBayarLangsungError('Masukkan uang yang diterima.'); return }
       if (bayarLangsungKembalian && !bayarLangsungKembalian.isValid) {
         setBayarLangsungError(bayarLangsungKembalian.message)
+        return
+      }
+    }
+    if (bayarLangsungMetode === 'SPLIT') {
+      if (bayarLangsungTransfer === '' || bayarLangsungUang === '') {
+        setBayarLangsungError('Masukkan nominal transfer dan uang cash yang diterima.')
+        return
+      }
+      if (bayarLangsungSplit && !bayarLangsungSplit.isValid) {
+        setBayarLangsungError(bayarLangsungSplit.message)
         return
       }
     }
@@ -614,8 +724,11 @@ export default function TransaksiClient({ session, menus: initialMenus, initialA
           catatan: item.catatan,
         })),
       }
-      if (bayarLangsungMetode === 'CASH') {
+      if (bayarLangsungMetode === 'CASH' || bayarLangsungMetode === 'SPLIT') {
         body.uangDiterima = bayarLangsungUang
+      }
+      if (bayarLangsungMetode === 'SPLIT') {
+        body.jumlahTransfer = bayarLangsungTransfer
       }
 
       const res = await fetch('/api/transaksi/bayar-langsung', {
@@ -629,9 +742,7 @@ export default function TransaksiClient({ session, menus: initialMenus, initialA
         return
       }
 
-      const payment = data.meta?.cash
-        ? { uangDiterima: Number(data.meta.cash.uangDiterima), kembalian: Number(data.meta.cash.kembalian) }
-        : null
+      const payment = toReceiptPayment(data.meta?.cash)
 
       setReceiptPayment(payment)
       setCompletedTransaksi(data.data)
@@ -643,7 +754,13 @@ export default function TransaksiClient({ session, menus: initialMenus, initialA
       setNomorMeja('')
       setSelectedOrder(null)
       setUangDiterima('')
+      setMetodePembayaran('CASH')
+      setJumlahTransfer('')
+      setBayarLangsungMetode('CASH')
+      setBayarLangsungUang('')
+      setBayarLangsungTransfer('')
       setKembalianResult(null)
+      setIsReprint(false)
       setError('')
       setSuccess('')
       await loadActiveOrders()
@@ -671,14 +788,24 @@ export default function TransaksiClient({ session, menus: initialMenus, initialA
         return
       }
     }
+    if (metodePembayaran === 'SPLIT') {
+      if (jumlahTransfer === '' || uangDiterima === '') { setError('Masukkan nominal transfer dan uang cash yang diterima.'); return }
+      if (splitResult && !splitResult.isValid) {
+        setError(splitResult.message)
+        return
+      }
+    }
     setError('')
     setSuccess('')
     setPaying(true)
     try {
       const body: Record<string, unknown> = { metodePembayaran }
-      if (metodePembayaran === 'CASH' && typeof uangDiterima === 'number') {
+      if ((metodePembayaran === 'CASH' || metodePembayaran === 'SPLIT') && typeof uangDiterima === 'number') {
         body.uangDiterima = uangDiterima
-        body.kembalian = kembalianResult?.kembalian ?? 0
+        body.kembalian = splitResult?.kembalian ?? kembalianResult?.kembalian ?? 0
+      }
+      if (metodePembayaran === 'SPLIT' && typeof jumlahTransfer === 'number') {
+        body.jumlahTransfer = jumlahTransfer
       }
       const res = await fetch(`/api/transaksi/${selectedOrder.id}/bayar`, {
         method: 'POST',
@@ -687,11 +814,7 @@ export default function TransaksiClient({ session, menus: initialMenus, initialA
       })
       const data = await res.json()
       if (data.success) {
-        setReceiptPayment(
-          metodePembayaran === 'CASH' && typeof uangDiterima === 'number'
-            ? { uangDiterima, kembalian: kembalianResult?.kembalian ?? 0 }
-            : null
-        )
+        setReceiptPayment(toReceiptPayment(data.meta?.cash))
         setCompletedTransaksi(data.data)
         setShowReceiptModal(true)
         resetOrderInput()
@@ -710,6 +833,7 @@ export default function TransaksiClient({ session, menus: initialMenus, initialA
     setShowReceiptModal(false)
     setCompletedTransaksi(null)
     setReceiptPayment(null)
+    setIsReprint(false)
     setError('')
     setSuccess('')
   }
@@ -782,6 +906,33 @@ export default function TransaksiClient({ session, menus: initialMenus, initialA
           </div>
         )}
       </div>
+
+      <details className="card no-print" style={{ padding: '1rem', marginBottom: '1rem' }} onToggle={(event) => { if (event.currentTarget.open) void loadCompleted() }}>
+        <summary style={{ cursor: 'pointer', fontSize: '0.9rem', fontWeight: 600 }}>
+          Cetak Ulang Struk ({completedList.length})
+        </summary>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', margin: '0.75rem 0 0.5rem' }}>
+          <span className="text-secondary" style={{ fontSize: '0.75rem' }}>Transaksi selesai pada shift berjalan.</span>
+          <button type="button" onClick={() => void loadCompleted()} className="btn btn-ghost btn-sm" style={{ fontSize: '0.75rem', padding: '0.3rem 0.6rem' }}>
+            Refresh
+          </button>
+        </div>
+        <div style={{ maxHeight: '220px', overflowY: 'auto' }}>
+          {completedList.length === 0 ? (
+            <p className="text-secondary" style={{ margin: '0.5rem 0 0', fontSize: '0.8rem' }}>Belum ada transaksi selesai di shift ini.</p>
+          ) : completedList.map((transaksi) => (
+            <div key={transaksi.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 0', borderTop: '1px solid var(--color-border)' }}>
+              <span style={{ fontSize: '0.8rem' }}>
+                {new Date(transaksi.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} · {transaksi.nomorMeja} · Rp {transaksi.total.toLocaleString('id-ID')}
+                {transaksi.metodePembayaran === 'SPLIT' ? ' · Split' : ''}
+              </span>
+              <button type="button" onClick={() => handleOpenReprint(transaksi)} className="btn btn-ghost btn-sm" style={{ fontSize: '0.75rem', padding: '0.3rem 0.6rem' }}>
+                <Printer size={12} /> Cetak Ulang
+              </button>
+            </div>
+          ))}
+        </div>
+      </details>
 
       {/* POS Two-Column Grid */}
       <div className="no-print pos-grid">
@@ -1144,16 +1295,16 @@ export default function TransaksiClient({ session, menus: initialMenus, initialA
                   <strong style={{ fontVariantNumeric: 'tabular-nums' }}>Rp {selectedOrder.total.toLocaleString('id-ID')}</strong>
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
-                  {(['CASH', 'TRANSFER'] as const).map((method) => (
+                  {(['CASH', 'TRANSFER', 'SPLIT'] as const).map((method) => (
                     <button
                       key={method}
                       type="button"
                       onClick={() => setMetodePembayaran(method)}
                       className={`btn btn-sm ${metodePembayaran === method ? 'btn-primary' : 'btn-ghost'}`}
-                      style={{ flex: 1, justifyContent: 'center' }}
+                      style={{ flex: 1, justifyContent: 'center', fontSize: '0.75rem', padding: '0.4rem' }}
                     >
-                      {method === 'CASH' ? <Banknote size={14} /> : <CreditCard size={14} />}
-                      {method}
+                      {method === 'TRANSFER' ? <CreditCard size={14} /> : <Banknote size={14} />}
+                      {method === 'SPLIT' ? 'CASH+TRF' : method}
                     </button>
                   ))}
                 </div>
@@ -1199,10 +1350,21 @@ export default function TransaksiClient({ session, menus: initialMenus, initialA
                   </div>
                 )}
 
+                {metodePembayaran === 'SPLIT' && (
+                  <SplitPaymentFields
+                    total={selectedOrder.total}
+                    jumlahTransfer={jumlahTransfer}
+                    uangDiterima={uangDiterima}
+                    onTransferChange={setJumlahTransfer}
+                    onUangChange={setUangDiterima}
+                    result={splitResult}
+                  />
+                )}
+
                 <button
                   type="button"
                   onClick={handlePayOrder}
-                  disabled={paying || cart.length > 0 || selectedOrder.items.length === 0 || (metodePembayaran === 'CASH' && kembalianResult !== null && !kembalianResult.isValid)}
+                  disabled={paying || cart.length > 0 || selectedOrder.items.length === 0 || (metodePembayaran === 'CASH' && kembalianResult !== null && !kembalianResult.isValid) || (metodePembayaran === 'SPLIT' && splitResult !== null && !splitResult.isValid)}
                   className="btn btn-success w-full"
                   style={{ justifyContent: 'center', fontWeight: 700 }}
                 >
@@ -1434,17 +1596,17 @@ export default function TransaksiClient({ session, menus: initialMenus, initialA
               )}
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0.5rem', marginBottom: '1rem' }}>
-              {(['CASH', 'TRANSFER'] as const).map((method) => (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '0.5rem', marginBottom: '1rem' }}>
+              {(['CASH', 'TRANSFER', 'SPLIT'] as const).map((method) => (
                 <button
                   key={method}
                   type="button"
                   onClick={() => { setBayarLangsungMetode(method); setBayarLangsungError('') }}
                   className={`btn ${bayarLangsungMetode === method ? 'btn-primary' : 'btn-ghost'}`}
-                  style={{ minHeight: '48px', justifyContent: 'center', padding: '0.5rem' }}
+                  style={{ minHeight: '48px', justifyContent: 'center', padding: '0.4rem', fontSize: '0.8rem' }}
                 >
-                  {method === 'CASH' ? <Banknote size={16} /> : <CreditCard size={16} />}
-                  {method}
+                  {method === 'TRANSFER' ? <CreditCard size={16} /> : <Banknote size={16} />}
+                  {method === 'SPLIT' ? 'CASH+TRF' : method}
                 </button>
               ))}
             </div>
@@ -1484,6 +1646,18 @@ export default function TransaksiClient({ session, menus: initialMenus, initialA
               </div>
             )}
 
+            {bayarLangsungMetode === 'SPLIT' && (
+              <SplitPaymentFields
+                total={bayarLangsungTotal}
+                jumlahTransfer={bayarLangsungTransfer}
+                uangDiterima={bayarLangsungUang}
+                onTransferChange={setBayarLangsungTransfer}
+                onUangChange={setBayarLangsungUang}
+                result={bayarLangsungSplit}
+                compact
+              />
+            )}
+
             {bayarLangsungError && (
               <div className="alert alert-error" role="alert" style={{ marginBottom: '1rem', fontSize: '0.85rem' }}>
                 {bayarLangsungError}
@@ -1497,7 +1671,7 @@ export default function TransaksiClient({ session, menus: initialMenus, initialA
               <button
                 type="button"
                 onClick={handleBayarLangsung}
-                disabled={paying || (bayarLangsungMetode === 'CASH' && (!bayarLangsungKembalian || !bayarLangsungKembalian.isValid))}
+                disabled={paying || (bayarLangsungMetode === 'CASH' && (!bayarLangsungKembalian || !bayarLangsungKembalian.isValid)) || (bayarLangsungMetode === 'SPLIT' && (!bayarLangsungSplit || !bayarLangsungSplit.isValid))}
                 className="btn btn-success"
                 style={{ minHeight: '48px', justifyContent: 'center', fontWeight: 800 }}
               >
@@ -1513,16 +1687,16 @@ export default function TransaksiClient({ session, menus: initialMenus, initialA
         <div className="modal-overlay no-print" style={{ position: 'fixed', inset: 0, background: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', zIndex: 1000, animation: 'fadeIn 0.2s ease-out' }}>
           <div className="card" style={{ width: '100%', maxWidth: '420px', maxHeight: '92vh', display: 'flex', flexDirection: 'column', padding: '1.5rem', background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)', animation: 'scaleIn 0.2s ease-out' }}>
             <div style={{ textAlign: 'center', marginBottom: '1.25rem', flexShrink: 0 }}>
-              <CheckCircle size={40} style={{ color: 'var(--color-success)', marginBottom: '0.5rem' }} />
-              <h3 style={{ fontSize: '1.25rem', margin: 0 }}>Transaksi Berhasil!</h3>
+              <CheckCircle size={40} style={{ color: isReprint ? 'var(--color-text-secondary)' : 'var(--color-success)', marginBottom: '0.5rem' }} />
+              <h3 style={{ fontSize: '1.25rem', margin: 0 }}>{isReprint ? 'Cetak Ulang Struk' : 'Transaksi Berhasil!'}</h3>
               <p className="text-secondary text-xs">
-                Transaksi telah tercatat di sistem. Silakan cetak struk untuk pelanggan.
+                {isReprint ? 'Struk resmi akan dicetak ulang dengan penanda cetak ulang.' : 'Transaksi telah tercatat di sistem. Silakan cetak struk untuk pelanggan.'}
               </p>
             </div>
 
             {/* The D4-504 screen is short, so the preview scrolls and the buttons stay pinned. */}
             <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
-              <Receipt transaction={completedTransaksi} cashier={session.namaLengkap || session.username} username={session.username} warungKode={session.warungKode} warungNama={session.warungNama} warungAlamat={session.warungAlamat} width={printerWidth} preview uangDiterima={receiptPayment?.uangDiterima} kembalian={receiptPayment?.kembalian} />
+              <Receipt transaction={completedTransaksi} cashier={session.namaLengkap || session.username} username={session.username} warungKode={session.warungKode} warungNama={session.warungNama} warungAlamat={session.warungAlamat} width={printerWidth} preview reprint={isReprint} uangDiterima={receiptPayment?.uangDiterima} kembalian={receiptPayment?.kembalian} />
               <div className="receipt-width-picker">
                 <span>Ukuran printer</span>
                 {(['58mm', '80mm'] as const).map((width) => <button key={width} type="button" onClick={() => setPrinterWidth(width)} className={`btn btn-sm ${printerWidth === width ? 'btn-primary' : 'btn-ghost'}`}>{width}</button>)}
@@ -1533,7 +1707,7 @@ export default function TransaksiClient({ session, menus: initialMenus, initialA
               <div style={{ background: 'var(--color-accent-soft)', border: '1px solid var(--color-accent)', borderRadius: 'var(--radius-md)', padding: '0.75rem', marginBottom: '1rem', fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>
                 <strong style={{ color: 'var(--color-text-primary)' }}>Cara cetak dari Android:</strong>
                 <ol style={{ margin: '0.5rem 0 0 1.25rem', padding: 0, lineHeight: 1.6 }}>
-                  <li>Klik <strong>Cetak Struk</strong></li>
+                  <li>Klik <strong>{isReprint ? 'Cetak Ulang' : 'Cetak Struk'}</strong></li>
                   <li>Pilih printer <strong>Blueprint</strong></li>
                   <li>Tap <strong>&quot;Kertas&quot;</strong> → pilih <strong>&quot;Rol 58mm&quot;</strong> atau <strong>&quot;Rol 80mm&quot;</strong> jika ada</li>
                   <li>Jika tidak ada, pilih <strong>&quot;Lainnya&quot;</strong> → cari ukuran <strong>72mm</strong></li>
@@ -1546,10 +1720,10 @@ export default function TransaksiClient({ session, menus: initialMenus, initialA
 
             <div style={{ display: 'flex', gap: '0.75rem', flexShrink: 0, paddingTop: '0.5rem' }}>
               <button type="button" onClick={handleNewOrder} className="btn btn-ghost" style={{ flex: 1, justifyContent: 'center' }}>
-                Pesanan Baru
+                {isReprint ? 'Tutup' : 'Pesanan Baru'}
               </button>
               <button type="button" id="btn-cetak-struk" onClick={handlePrintReceipt} disabled={printing} className="btn btn-primary" style={{ flex: 1, justifyContent: 'center', fontWeight: 700 }}>
-                <Printer size={16} /> {printing ? 'Mencetak...' : error ? 'Coba lagi' : 'Cetak Struk'}
+                <Printer size={16} /> {printing ? 'Mencetak...' : error ? 'Coba lagi' : isReprint ? 'Cetak Ulang' : 'Cetak Struk'}
               </button>
             </div>
           </div>
@@ -1637,7 +1811,7 @@ export default function TransaksiClient({ session, menus: initialMenus, initialA
 
       <PrinterSetup open={showPrinterSetup} onClose={() => setShowPrinterSetup(false)} onConfigured={(config) => { if (config) setPrinterWidth(config.width) }} />
 
-      {completedTransaksi && <Receipt transaction={completedTransaksi} cashier={session.namaLengkap || session.username} username={session.username} warungKode={session.warungKode} warungNama={session.warungNama} warungAlamat={session.warungAlamat} width={printerWidth} uangDiterima={receiptPayment?.uangDiterima} kembalian={receiptPayment?.kembalian} />}
+      {completedTransaksi && <Receipt transaction={completedTransaksi} cashier={session.namaLengkap || session.username} username={session.username} warungKode={session.warungKode} warungNama={session.warungNama} warungAlamat={session.warungAlamat} width={printerWidth} reprint={isReprint} uangDiterima={receiptPayment?.uangDiterima} kembalian={receiptPayment?.kembalian} />}
     </div>
   )
 }

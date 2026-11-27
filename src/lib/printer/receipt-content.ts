@@ -14,6 +14,10 @@ export interface ReceiptTransaction {
   total: number
   createdAt: string
   metodePembayaran?: string | null
+  jumlahCash?: number | null
+  jumlahTransfer?: number | null
+  uangDiterima?: number | null
+  kembalian?: number | null
   items: Array<{
     namaMenu: string
     hargaSatuan: number
@@ -32,6 +36,8 @@ export interface ReceiptData {
   reprint: boolean
   uangDiterima?: number
   kembalian?: number
+  jumlahCash: number
+  jumlahTransfer: number
 }
 
 export interface CreateReceiptInput {
@@ -53,22 +59,28 @@ export interface ReceiptLine {
 const WIB_OFFSET_MS = 7 * 60 * 60 * 1000
 
 export function createReceiptData(input: CreateReceiptInput): ReceiptData {
-  const isCash = input.transaction.metodePembayaran === 'CASH'
-  const uangDiterima = isCash ? input.uangDiterima : undefined
-  let kembalian = isCash ? input.kembalian : undefined
+  const t = input.transaction
+  const isSplit = t.metodePembayaran === 'SPLIT'
+  const isCash = t.metodePembayaran === 'CASH' || isSplit
+  const uangDiterima = isCash ? input.uangDiterima ?? t.uangDiterima ?? undefined : undefined
+  let kembalian = isCash ? input.kembalian ?? t.kembalian ?? undefined : undefined
 
-  if (isCash && uangDiterima !== undefined && kembalian === undefined) {
-    kembalian = Math.max(0, uangDiterima - input.transaction.total)
+  if (isCash && uangDiterima !== undefined && kembalian === undefined && !isSplit) {
+    kembalian = Math.max(0, uangDiterima - t.total)
   }
 
+  const jumlahTransfer = isSplit ? t.jumlahTransfer ?? 0 : 0
+
   return {
-    transaction: input.transaction,
+    transaction: t,
     cashier: input.cashier,
     warungNama: input.warungNama,
     warungAlamat: input.warungAlamat ?? null,
     reprint: input.reprint ?? false,
     uangDiterima,
     kembalian,
+    jumlahCash: isSplit ? t.jumlahCash ?? t.total - jumlahTransfer : t.total,
+    jumlahTransfer,
   }
 }
 
@@ -76,13 +88,15 @@ export function paymentLabel(method: string | null | undefined): string {
   if (method === 'CASH') return 'Cash'
   if (method === 'QRIS') return 'QRIS'
   if (method === 'TRANSFER') return 'Transfer'
+  if (method === 'SPLIT') return 'Cash + Transfer'
   return '-'
 }
 
 export function buildReceiptLines(receipt: ReceiptData, width: number): ReceiptLine[] {
   const lines: ReceiptLine[] = []
   const t = receipt.transaction
-  const isCash = t.metodePembayaran === 'CASH'
+  const isSplit = t.metodePembayaran === 'SPLIT'
+  const isCash = t.metodePembayaran === 'CASH' || isSplit
   const amountWidth = amountColumnWidth(receipt)
 
   const left = (text: string) => {
@@ -141,8 +155,16 @@ export function buildReceiptLines(receipt: ReceiptData, width: number): ReceiptL
   row('Sub Total', amountText(t.total, amountWidth))
   row('Total', amountText(t.total, amountWidth))
 
-  const paid = isCash ? receipt.uangDiterima ?? t.total : t.total
-  row(`Bayar (${paymentLabel(t.metodePembayaran)})`, amountText(paid, amountWidth))
+  if (isSplit) {
+    row('Bayar (Cash)', amountText(receipt.jumlahCash, amountWidth))
+    row('Bayar (Transfer)', amountText(receipt.jumlahTransfer, amountWidth))
+    if (receipt.uangDiterima !== undefined && receipt.uangDiterima > receipt.jumlahCash) {
+      row('Uang diterima', amountText(receipt.uangDiterima, amountWidth))
+    }
+  } else {
+    const paid = isCash ? receipt.uangDiterima ?? t.total : t.total
+    row(`Bayar (${paymentLabel(t.metodePembayaran)})`, amountText(paid, amountWidth))
+  }
   if (isCash && receipt.kembalian !== undefined) {
     row('Kembali', amountText(receipt.kembalian, amountWidth))
   }
@@ -158,11 +180,10 @@ export function buildReceiptLines(receipt: ReceiptData, width: number): ReceiptL
 
 function amountColumnWidth(receipt: ReceiptData): number {
   const t = receipt.transaction
-  const isCash = t.metodePembayaran === 'CASH'
-  const values = [t.total]
+  const values = [t.total, receipt.jumlahCash, receipt.jumlahTransfer]
 
-  if (isCash && receipt.uangDiterima !== undefined) values.push(receipt.uangDiterima)
-  if (isCash && receipt.kembalian !== undefined) values.push(receipt.kembalian)
+  if (receipt.uangDiterima !== undefined) values.push(receipt.uangDiterima)
+  if (receipt.kembalian !== undefined) values.push(receipt.kembalian)
   for (const item of t.items) {
     values.push(item.hargaSatuan, item.subtotal)
     if (item.diskonSatuan) values.push(item.diskonSatuan)

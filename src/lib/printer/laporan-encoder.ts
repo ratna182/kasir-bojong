@@ -72,6 +72,7 @@ function clock(iso: string | null | undefined): string {
 function metodeLabel(method: string): string {
   if (method === 'QRIS') return 'QRIS'
   if (method === 'TRANSFER') return 'TRSF'
+  if (method === 'SPLIT') return 'SPLIT'
   return 'CASH'
 }
 

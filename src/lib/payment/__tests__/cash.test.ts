@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest'
-import { hitungKembalian, generateQuickAmounts } from '../cash'
+import { hitungKembalian, hitungSplitPembayaran, generateQuickAmounts } from '../cash'
 
 describe('hitungKembalian', () => {
   test('uang cukup - kembalian positif', () => {
@@ -97,5 +97,44 @@ describe('generateQuickAmounts', () => {
     const amounts = generateQuickAmounts(0)
     expect(amounts).toContain(0)
     expect(amounts).toContain(100000)
+  })
+})
+
+describe('hitungSplitPembayaran', () => {
+  test('kembalian dihitung dari porsi cash', () => {
+    const result = hitungSplitPembayaran(100000, 40000, 60000)
+    expect(result.isValid).toBe(true)
+    expect(result.jumlahCash).toBe(60000)
+    expect(result.kembalian).toBe(0)
+    expect(result.message).toBe('Uang Pas')
+  })
+
+  test('cash lebih dari porsi cash menghasilkan kembalian', () => {
+    const result = hitungSplitPembayaran(100000, 40000, 75000)
+    expect(result.isValid).toBe(true)
+    expect(result.jumlahCash).toBe(60000)
+    expect(result.kembalian).toBe(15000)
+  })
+
+  test('cash kurang dari porsi cash invalid', () => {
+    const result = hitungSplitPembayaran(100000, 40000, 50000)
+    expect(result.isValid).toBe(false)
+    expect(result.message).toContain('Uang kurang')
+  })
+
+  test('transfer sama dengan total invalid', () => {
+    const result = hitungSplitPembayaran(100000, 100000, 0)
+    expect(result.isValid).toBe(false)
+    expect(result.message).toBe('Porsi transfer harus lebih kecil dari total tagihan.')
+  })
+
+  test('transfer melebihi total invalid', () => {
+    const result = hitungSplitPembayaran(100000, 120000, 0)
+    expect(result.isValid).toBe(false)
+  })
+
+  test('transfer dan cash nol invalid', () => {
+    const result = hitungSplitPembayaran(100000, 0, 100000)
+    expect(result.isValid).toBe(false)
   })
 })

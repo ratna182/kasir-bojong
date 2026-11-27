@@ -72,7 +72,9 @@ interface ShiftTransaction {
   id: string
   nomorMeja: string
   total: number
-  metodePembayaran: 'CASH' | 'QRIS' | 'TRANSFER' | null
+  metodePembayaran: 'CASH' | 'QRIS' | 'TRANSFER' | 'SPLIT' | null
+  jumlahCash?: number | null
+  jumlahTransfer?: number | null
   createdAt: Date
   items: Array<{ menuId: string; namaMenu: string; qty: number; subtotal: number }>
 }
@@ -82,8 +84,12 @@ function emptyTotals() {
 }
 
 function addTotals(target: ReturnType<typeof emptyTotals>, transaksi: ShiftTransaction) {
-  if (transaksi.metodePembayaran === 'QRIS') target.totalQRIS += transaksi.total
-  else if (transaksi.metodePembayaran === 'TRANSFER') target.totalTransfer += transaksi.total
+  if (transaksi.metodePembayaran === 'SPLIT') {
+    const transfer = transaksi.jumlahTransfer ?? 0
+    target.totalTransfer += transfer
+    target.totalCash += transaksi.jumlahCash ?? transaksi.total - transfer
+  } else if (transaksi.metodePembayaran === 'QRIS') target.totalQRIS += transaksi.total
+  else if (transaksi.metodePembayaran === 'TRANSFER') target.totalTransfer += transaksi.jumlahTransfer ?? transaksi.total
   else target.totalCash += transaksi.total
   for (const item of transaksi.items) target.jumlahItem += item.qty
 }

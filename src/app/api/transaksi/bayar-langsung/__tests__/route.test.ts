@@ -147,6 +147,38 @@ describe('Bayar langsung API', () => {
     }))
   })
 
+  it('stores split portions and computes change from the cash portion', async () => {
+    const { create } = transactionMock()
+
+    const response = await POST(makeRequest({
+      nomorMeja: 'Meja 1',
+      idempotencyKey: key,
+      metodePembayaran: 'SPLIT',
+      jumlahTransfer: 20000,
+      uangDiterima: 35000,
+      items: [{ menuId: 'menu1', qty: 2 }],
+    }))
+    const data = await response.json()
+
+    expect(response.status).toBe(201)
+    expect(data.meta.cash).toEqual({
+      uangDiterima: 35000,
+      kembalian: 5000,
+      message: expect.stringContaining('5.000'),
+      jumlahCash: 30000,
+      jumlahTransfer: 20000,
+    })
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        metodePembayaran: 'SPLIT',
+        jumlahCash: 30000,
+        jumlahTransfer: 20000,
+        uangDiterima: 35000,
+        kembalian: 5000,
+      }),
+    }))
+  })
+
   it('returns the same transaction when the idempotency key is retried', async () => {
     const existing = { id: 'trx1', status: 'SELESAI', total: 50000, items: [] }
     const { create, tx } = transactionMock({ existingByKey: existing })

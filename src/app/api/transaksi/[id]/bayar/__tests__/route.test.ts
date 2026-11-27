@@ -58,7 +58,7 @@ describe('Bayar order API', () => {
 
     const request = new NextRequest('http://localhost/api/transaksi/trx1/bayar', {
       method: 'POST',
-      body: JSON.stringify({ metodePembayaran: 'CASH' }),
+      body: JSON.stringify({ metodePembayaran: 'CASH', uangDiterima: 25000 }),
     })
 
     const response = await POST(request, { params: Promise.resolve({ id: 'trx1' }) })
@@ -74,6 +74,40 @@ describe('Bayar order API', () => {
     }))
   })
 
+  it('saves split portions when finalizing an open order', async () => {
+    const findFirst = vi.fn().mockResolvedValue({ id: 'trx1', total: 50000, items: [{ id: 'item1' }] })
+    const updateMany = vi.fn().mockResolvedValue({ count: 1 })
+    vi.mocked(prisma.$transaction).mockImplementation(async (callback) => callback({
+      kasirShift: { findFirst: vi.fn().mockResolvedValue({ id: 'shift1', dibukaPada: new Date() }) },
+      transaksi: {
+        findFirst,
+        count: vi.fn().mockResolvedValue(0),
+        updateMany,
+        findUnique: vi.fn().mockResolvedValue({ id: 'trx1', status: 'SELESAI', metodePembayaran: 'SPLIT', total: 50000, items: [{ id: 'item1' }] }),
+      },
+    } as never))
+
+    const request = new NextRequest('http://localhost/api/transaksi/trx1/bayar', {
+      method: 'POST',
+      body: JSON.stringify({ metodePembayaran: 'SPLIT', jumlahTransfer: 20000, uangDiterima: 35000 }),
+    })
+
+    const response = await POST(request, { params: Promise.resolve({ id: 'trx1' }) })
+    const data = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(data.meta.cash.kembalian).toBe(5000)
+    expect(updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        metodePembayaran: 'SPLIT',
+        jumlahCash: 30000,
+        jumlahTransfer: 20000,
+        uangDiterima: 35000,
+        kembalian: 5000,
+      }),
+    }))
+  })
+
   it('rejects when another process has already paid the order', async () => {
     vi.mocked(prisma.$transaction).mockImplementation(async (callback) => callback({
       kasirShift: { findFirst: vi.fn().mockResolvedValue({ id: 'shift1', dibukaPada: new Date() }) },
@@ -86,7 +120,7 @@ describe('Bayar order API', () => {
 
     const request = new NextRequest('http://localhost/api/transaksi/trx1/bayar', {
       method: 'POST',
-      body: JSON.stringify({ metodePembayaran: 'CASH' }),
+      body: JSON.stringify({ metodePembayaran: 'CASH', uangDiterima: 25000 }),
     })
 
     const response = await POST(request, { params: Promise.resolve({ id: 'trx1' }) })

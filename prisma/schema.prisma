@@ -110,6 +110,10 @@ model Transaksi {
   nomorMeja        String             @map("nomor_meja")
   status           StatusTransaksi    @default(OPEN)
   metodePembayaran MetodePembayaran?  @map("metode_pembayaran")
+  jumlahCash       Int?               @map("jumlah_cash")
+  jumlahTransfer   Int?               @map("jumlah_transfer")
+  uangDiterima     Int?               @map("uang_diterima")
+  kembalian        Int?               @map("kembalian")
   total            Int                @default(0)
   tanggal          DateTime           @default(now()) @map("tanggal") @db.Date
   createdAt        DateTime           @default(now()) @map("created_at")
@@ -243,6 +247,7 @@ enum MetodePembayaran {
   CASH
   QRIS
   TRANSFER
+  SPLIT
 }
 
 enum StatusShift {

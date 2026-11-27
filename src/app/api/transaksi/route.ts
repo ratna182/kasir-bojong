@@ -263,6 +263,10 @@ export async function GET(request: NextRequest) {
     if (!warungId) {
       return NextResponse.json({ success: false, message: 'Kasir tidak terdaftar di warung.' }, { status: 403 })
     }
+    const { allowed } = apiRateLimiter.check(`transaksi-list:${warungId}:${context!.user.id}`)
+    if (!allowed) {
+      return NextResponse.json({ success: false, message: 'Terlalu banyak request. Coba lagi sebentar.' }, { status: 429 })
+    }
     const shift = await getOpenShift(prisma, warungId)
     if (!shift) {
       return NextResponse.json({ success: true, data: [] })

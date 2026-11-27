@@ -1,5 +1,5 @@
 import type { Prisma } from '@prisma/client'
-import { hitungKembalian } from './payment/cash'
+import { hitungKembalian, hitungSplitPembayaran } from './payment/cash'
 import { isRupiahAmount } from './rupiah'
 
 export const DAILY_TRANSACTION_LIMIT = 150
@@ -10,7 +10,7 @@ export const MAX_CHECKOUT_TOTAL = 1_000_000_000
 
 const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9_-]{16,128}$/
 
-export type MetodePembayaranInput = 'CASH' | 'TRANSFER'
+export type MetodePembayaranInput = 'CASH' | 'TRANSFER' | 'SPLIT'
 
 export interface CheckoutItemInput {
   menuId: string
@@ -34,6 +34,8 @@ export interface CashPaymentMeta {
   uangDiterima: number
   kembalian: number
   message: string
+  jumlahCash?: number
+  jumlahTransfer?: number
 }
 
 type ResolveResult =
@@ -45,7 +47,7 @@ type CashResult =
   | { ok: false; message: string }
 
 export function parseMetodePembayaran(value: unknown): MetodePembayaranInput | null {
-  return value === 'CASH' || value === 'TRANSFER' ? value : null
+  return value === 'CASH' || value === 'TRANSFER' || value === 'SPLIT' ? value : null
 }
 
 export function isValidIdempotencyKey(value: unknown): value is string {
@@ -179,6 +181,48 @@ export function validateCashPayment(value: unknown, total: number): CashResult {
       uangDiterima: value,
       kembalian: result.kembalian,
       message: result.message,
+    },
+  }
+}
+
+export function paymentFields(
+  metodePembayaran: MetodePembayaranInput,
+  total: number,
+  cash: CashPaymentMeta | null,
+) {
+  if (metodePembayaran === 'TRANSFER') {
+    return { uangDiterima: null, kembalian: null, jumlahCash: 0, jumlahTransfer: total }
+  }
+  return {
+    uangDiterima: cash?.uangDiterima ?? null,
+    kembalian: cash?.kembalian ?? null,
+    jumlahCash: cash?.jumlahCash ?? total,
+    jumlahTransfer: cash?.jumlahTransfer ?? 0,
+  }
+}
+
+export function validateSplitPayment(
+  jumlahTransfer: unknown,
+  uangDiterima: unknown,
+  total: number,
+): CashResult {
+  if (!isRupiahAmount(jumlahTransfer) || !isRupiahAmount(uangDiterima)) {
+    return { ok: false, message: 'Nominal split wajib diisi dengan angka bulat.' }
+  }
+
+  const result = hitungSplitPembayaran(total, jumlahTransfer, uangDiterima)
+  if (!result.isValid) {
+    return { ok: false, message: result.message }
+  }
+
+  return {
+    ok: true,
+    meta: {
+      uangDiterima,
+      kembalian: result.kembalian,
+      message: result.message,
+      jumlahCash: result.jumlahCash,
+      jumlahTransfer,
     },
   }
 }

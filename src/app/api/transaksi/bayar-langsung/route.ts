@@ -11,8 +11,10 @@ import {
   isValidIdempotencyKey,
   parseCheckoutItems,
   parseMetodePembayaran,
+  paymentFields,
   resolveCheckoutItems,
   validateCashPayment,
+  validateSplitPayment,
   type CashPaymentMeta,
   type CheckoutItemInput,
   type MetodePembayaranInput,
@@ -49,8 +51,16 @@ async function findByIdempotencyKey(warungId: string, idempotencyKey: string) {
 function cashForExisting(
   metodePembayaran: MetodePembayaranInput,
   uangDiterima: unknown,
+  jumlahTransfer: unknown,
   total: number,
 ): CashPaymentMeta | null {
+  if (metodePembayaran === 'SPLIT') {
+    const split = validateSplitPayment(jumlahTransfer, uangDiterima, total)
+    if (!split.ok) {
+      throw new CheckoutError(422, split.message)
+    }
+    return split.meta
+  }
   if (metodePembayaran !== 'CASH') return null
   const cash = validateCashPayment(uangDiterima, total)
   if (!cash.ok) {
@@ -67,6 +77,7 @@ async function executeCheckout(
   items: CheckoutItemInput[],
   metodePembayaran: MetodePembayaranInput,
   uangDiterima: unknown,
+  jumlahTransfer: unknown,
   idempotencyKey: string,
 ) {
   return prisma.$transaction(async (tx) => {
@@ -81,7 +92,7 @@ async function executeCheckout(
       }
       return {
         transaksi: existingByKey,
-        cash: cashForExisting(metodePembayaran, uangDiterima, existingByKey.total),
+        cash: cashForExisting(metodePembayaran, uangDiterima, jumlahTransfer, existingByKey.total),
         idempotent: true,
       }
     }
@@ -135,7 +146,7 @@ async function executeCheckout(
       throw new CheckoutError(422, 'Total pembayaran tidak valid.')
     }
 
-    const cash = cashForExisting(metodePembayaran, uangDiterima, total)
+    const cash = cashForExisting(metodePembayaran, uangDiterima, jumlahTransfer, total)
     const printedAt = new Date()
 
     if (!existingOrder) {
@@ -147,6 +158,7 @@ async function executeCheckout(
           nomorMeja,
           status: 'SELESAI',
           metodePembayaran,
+          ...paymentFields(metodePembayaran, total, cash),
           total,
           tanggal: getStoreDayRange(shift.dibukaPada ?? new Date()).today,
           printedAt,
@@ -170,6 +182,7 @@ async function executeCheckout(
       data: {
         status: 'SELESAI',
         metodePembayaran,
+        ...paymentFields(metodePembayaran, total, cash),
         total,
         printedAt,
         idempotencyKey,
@@ -210,6 +223,7 @@ export async function POST(request: NextRequest) {
   let idempotencyKey: string | null = null
   let metodePembayaran: MetodePembayaranInput | null = null
   let uangDiterima: unknown
+  let jumlahTransfer: unknown
 
   try {
     const context = getAuthContext(request)
@@ -237,6 +251,7 @@ export async function POST(request: NextRequest) {
     idempotencyKey = typeof payload.idempotencyKey === 'string' ? payload.idempotencyKey : null
     metodePembayaran = parseMetodePembayaran(payload.metodePembayaran)
     uangDiterima = payload.uangDiterima
+    jumlahTransfer = payload.jumlahTransfer
     const orderId = typeof payload.orderId === 'string' && payload.orderId.trim() ? payload.orderId.trim() : null
     const items = parseCheckoutItems(payload.items, Boolean(orderId))
 
@@ -261,6 +276,9 @@ export async function POST(request: NextRequest) {
     if (metodePembayaran === 'CASH' && !isRupiahAmount(uangDiterima)) {
       return NextResponse.json({ success: false, message: 'Uang diterima wajib diisi dengan angka bulat.' }, { status: 422 })
     }
+    if (metodePembayaran === 'SPLIT' && !isRupiahAmount(jumlahTransfer)) {
+      return NextResponse.json({ success: false, message: 'Nominal transfer wajib diisi dengan angka bulat.' }, { status: 422 })
+    }
 
     const result = await checkoutWithRetry(
       warungId,
@@ -270,6 +288,7 @@ export async function POST(request: NextRequest) {
       items.items,
       metodePembayaran,
       uangDiterima,
+      jumlahTransfer,
       idempotencyKey,
     )
 
@@ -292,7 +311,7 @@ export async function POST(request: NextRequest) {
         if (existing) {
           try {
             const cash = metodePembayaran
-              ? cashForExisting(metodePembayaran, uangDiterima, existing.total)
+              ? cashForExisting(metodePembayaran, uangDiterima, jumlahTransfer, existing.total)
               : null
             return NextResponse.json({
               success: true,
