@@ -4,20 +4,34 @@
 
 | Layanan | Link | Digunakan untuk |
 |---------|------|-----------------|
-| Neon Database | https://neon.tech | PostgreSQL database |
+| Supabase | https://supabase.com | PostgreSQL database |
 | Vercel | https://vercel.com | Hosting server Next.js |
 | GitHub | https://github.com | Repo & CI/CD |
 
 ---
 
-## 2. Setup Database (Neon)
+## 2. Setup Database (Supabase)
 
-1. Buka https://neon.tech → Sign up → Create Project
-2. Copy **Connection String** (pooled connection):
+1. Buka https://supabase.com → Sign up → New Project
+2. Pilih region **Southeast Asia (Singapore)**
+3. Buka **Project Settings → Database → Connection String**
+4. Copy dua URL:
+
+   **Transaction Pooler (port 6543)** → untuk `DATABASE_URL` app:
    ```
-   postgresql://user:pass@ep-xxx.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
+   postgresql://postgres.[ref]:[password]@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1
    ```
-3. Paste ke `.env` → `DATABASE_URL`
+
+   **Session Pooler / Direct (port 5432)** → untuk `DIRECT_URL` migrate lokal:
+   ```
+   postgresql://postgres.[ref]:[password]@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres
+   ```
+
+5. Paste ke `.env`:
+   ```env
+   DATABASE_URL="<transaction pooler url>"
+   DIRECT_URL="<session pooler url>"
+   ```
 
 ---
 
@@ -27,9 +41,10 @@
 2. Buka Vercel → Import Project → Pilih repo GitHub
 3. Environment Variables (Add di Vercel dashboard):
    ```
-   DATABASE_URL=postgresql://user:pass@ep-xxx.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
+   DATABASE_URL=postgresql://postgres.[ref]:[password]@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1
    SESSION_SECRET=random-string-32-chars (generate di bawah)
    ```
+   > **Catatan:** `DIRECT_URL` tidak perlu di-set di Vercel — hanya dibutuhkan saat `prisma migrate deploy` dari lokal.
 4. Deploy → Dapatkan URL: `https://kasir-seafood-xxx.vercel.app`
 5. Copy URL ini ke `.env` → `CAPACITOR_SERVER_URL`
 
@@ -83,8 +98,9 @@ adb install -r android/app/build/outputs/apk/debug/pinang-ranti-debug.apk
 ## 6. Konfigurasi .env Lengkap
 
 ```env
-# Database (Neon)
-DATABASE_URL="postgresql://user:pass@ep-xxx.ap-southeast-1.aws.neon.tech/kasir_seafood?sslmode=require"
+# Database (Supabase)
+DATABASE_URL="postgresql://postgres.[ref]:[password]@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1"
+DIRECT_URL="postgresql://postgres.[ref]:[password]@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres"
 
 # Server (Vercel URL setelah deploy)
 CAPACITOR_SERVER_URL="https://kasir-seafood-xxx.vercel.app"
@@ -102,7 +118,7 @@ SESSION_SECRET="your-generated-secret-here"
 | Masalah | Solusi |
 |---------|--------|
 | `adb devices` kosong | Aktifkan USB Debugging di HP, izin di popup |
-| Prisma migrate error | Pastikan DATABASE_URL benar, Neon aktif |
+| Prisma migrate error | Pastikan `DIRECT_URL` benar, project Supabase aktif |
 | Build Next.js error | Cek `npm run build` log, fix error TypeScript |
 | APK tidak bisa buka | Pastikan CAPACITOR_SERVER_URL HTTPS & benar |
 | Session tidak jalan | SESSION_SECRET harus sama di local & Vercel |
